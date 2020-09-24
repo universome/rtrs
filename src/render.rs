@@ -7,7 +7,7 @@ pub fn render() -> DynamicImage {
     let scene = Scene {
         objects: vec![&Sphere {
             center: Point {x: 0.0, y: 0.0, z: 0.0},
-            radius: 0.95,
+            radius: 0.8,
             color: FloatPixel {r: 1.0, g: 0.0, b: 0.0},
         }],
         camera: Camera::from_z_position(-1.0),

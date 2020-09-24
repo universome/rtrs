@@ -83,8 +83,8 @@ impl ViewingPlane {
     pub fn generate_uv_coords(&self, i: u32, j: u32) -> (f32, f32) {
         let x_dist = self.x_max - self.x_min;
         let y_dist = self.y_max - self.y_min;
-        let u = self.x_min - x_dist * (i as f32 + 0.5) / (self.width as f32);
-        let v = self.y_min - y_dist * (j as f32 + 0.5) / (self.height as f32);
+        let u = self.x_min + x_dist * (i as f32 + 0.5) / (self.width as f32);
+        let v = self.y_min + y_dist * (j as f32 + 0.5) / (self.height as f32);
 
         (u, v)
     }
