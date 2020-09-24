@@ -1,8 +1,11 @@
 //! A simple as possible example demonstrating how to use the `draw` API to display a texture.
 extern crate nannou;
+extern crate derive_more;
+
 use nannou::prelude::*;
 
 mod render;
+mod scene;
 
 
 fn main() {
@@ -14,7 +17,7 @@ struct Model {
 }
 
 fn model(app: &App) -> Model {
-    app.new_window().size(512, 512).view(view).build().unwrap();
+    app.new_window().size(640, 480).view(view).build().unwrap();
 
     let img = render::render();
     let texture = wgpu::Texture::from_image(app, &img);
