@@ -20,9 +20,12 @@ struct Model {
 }
 
 fn model(app: &App) -> Model {
-    app.new_window().size(640, 480).view(view).build().unwrap();
+    let width = 640;
+    let height = 480;
 
-    let img = render::render();
+    app.new_window().size(width, height).view(view).build().unwrap();
+
+    let img = render::render(width, height);
     let texture = wgpu::Texture::from_image(app, &img);
 
     Model { texture }

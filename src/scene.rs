@@ -1,6 +1,11 @@
 use std::ops;
+use std::ptr;
 use std::fmt::Debug;
 use derive_more::{Add, Sub};
+
+
+static MIN_RAY_T: f32 = 0.001;
+
 
 #[derive(Debug, Clone, Add)]
 pub struct Color {
@@ -55,6 +60,17 @@ impl Scene<'_> {
 
             for light in self.lights.iter() {
                 let light_dir = (&light.location - &ray_hit_point).normalize();
+                let shadow_ray = Ray {
+                    origin: ray_hit_point.clone(),
+                    direction: light_dir.clone()
+                };
+
+                if self.objects.iter()
+                    .filter(|o| !ptr::eq(o, &obj))
+                    .any(|o| o.compute_hit(&shadow_ray).is_some()) {
+                        break;
+                }
+
                 let strength = normal.dot_product(&light_dir).max(0.0);
 
                 color = color + &light.color * strength;
@@ -244,14 +260,21 @@ impl Surface for Sphere {
             return None;
         }
 
+        let t;
         let num_lhs = -ray.direction.dot_product(&orig_to_c);
         let denom = ray.direction.norm_squared();
 
         if discriminant == 0.0 {
-            Some(num_lhs / denom)
+            t = num_lhs / denom;
         } else {
-            Some((num_lhs - discriminant.sqrt()) / denom)
+            let discr_sqrt = discriminant.sqrt();
+            t = match num_lhs < discr_sqrt {
+                true => (num_lhs + discr_sqrt) / denom,
+                false => (num_lhs - discr_sqrt) / denom,
+            };
         }
+
+        if t >= MIN_RAY_T { Some(t) } else { None }
     }
 
     fn compute_normal(&self, point: &Point) -> Vec3 {
@@ -292,7 +315,7 @@ impl Surface for Plane {
         let num = (&self.bias - &ray.origin).dot_product(&self.normal);
         let t = num / denom;
 
-        if t >= 0.0 {
+        if t >= MIN_RAY_T {
             Some(t)
         } else {
             None
