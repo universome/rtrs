@@ -9,3 +9,4 @@ edition = "2018"
 [dependencies]
 nannou = "0.14"
 derive_more = "0.99"
+float-cmp = "0.8.0"

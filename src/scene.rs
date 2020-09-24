@@ -2,22 +2,37 @@ use std::ops;
 use std::fmt::Debug;
 use derive_more::{Add, Sub};
 
-#[derive(Debug, Clone)]
-pub struct FloatPixel {
+#[derive(Debug, Clone, Add)]
+pub struct Color {
     pub r: f32,
     pub g: f32,
     pub b: f32,
+}
+
+impl ops::Mul<f32> for &Color {
+    type Output = Color;
+
+    fn mul(self, strength: f32) -> Color {
+        Color {
+            r: self.r * strength,
+            g: self.g * strength,
+            b: self.b * strength,
+        }
+    }
 }
 
 pub struct Scene<'a> {
     pub objects: Vec<&'a dyn Surface>,
     pub camera: Camera,
     pub viewing_plane: ViewingPlane,
-    pub background_color: FloatPixel
+    pub background_color: Color,
+    pub lights: Vec<Light>,
+    pub ambient_strength: f32,
+    pub diffuse_strength: f32,
 }
 
 impl Scene<'_> {
-    pub fn compute_pixel(&self, i: u32, j: u32) -> FloatPixel {
+    pub fn compute_pixel(&self, i: u32, j: u32) -> Color {
         let (u, v) = self.viewing_plane.generate_uv_coords(i, j);
         let ray = self.camera.generate_ray(u, v, &self.viewing_plane);
         let mut closest_obj = None;
@@ -33,11 +48,29 @@ impl Scene<'_> {
         }
 
         if closest_obj.is_some() {
-            closest_obj.unwrap().get_color()
+            let obj = closest_obj.unwrap();
+            let mut color = &obj.get_color() * self.ambient_strength;
+            let ray_hit_point = ray.compute_point(min_t);
+            let normal = obj.compute_normal(&ray_hit_point);
+
+            for light in self.lights.iter() {
+                let light_dir = (&light.location - &ray_hit_point).normalize();
+                let strength = normal.dot_product(&light_dir).max(0.0);
+
+                color = color + &light.color * strength;
+            }
+
+            color
         } else {
             self.background_color.clone()
         }
     }
+}
+
+#[derive(Debug, Clone)]
+pub struct Light {
+    pub location: Point,
+    pub color: Color,
 }
 
 #[derive(Debug, Clone)]
@@ -59,7 +92,7 @@ impl Camera {
     }
 
     pub fn generate_ray(&self, u: f32, v: f32, viewing_plane: &ViewingPlane) -> Ray {
-        let d = self.origin.z - viewing_plane.z;
+        let d = viewing_plane.z - self.origin.z;
         Ray {
             // TODO: actually, we do not need to clone anything here, right?
             origin: self.origin.clone(),
@@ -103,7 +136,7 @@ impl Ray {
     }
 }
 
-#[derive(Debug, Clone, Add, Sub)]
+#[derive(Debug, Clone, Add, Sub, PartialEq)]
 pub struct Vec3 {
     x: f32,
     y: f32,
@@ -189,14 +222,14 @@ impl From<Vec3> for Point {
 pub trait Surface: Debug {
     fn compute_hit(&self, ray: &Ray) -> Option<f32>;
     fn compute_normal(&self, point: &Point) -> Vec3;
-    fn get_color(&self) -> FloatPixel;
+    fn get_color(&self) -> Color;
 }
 
 #[derive(Debug, Clone)]
 pub struct Sphere {
     pub center: Point,
     pub radius: f32,
-    pub color: FloatPixel,
+    pub color: Color,
 }
 
 impl Surface for Sphere {
@@ -214,14 +247,72 @@ impl Surface for Sphere {
         let num_lhs = -ray.direction.dot_product(&orig_to_c);
         let denom = ray.direction.norm_squared();
 
-        return Some((num_lhs - discriminant) / denom);
+        if discriminant == 0.0 {
+            Some(num_lhs / denom)
+        } else {
+            Some((num_lhs - discriminant.sqrt()) / denom)
+        }
     }
 
     fn compute_normal(&self, point: &Point) -> Vec3 {
         &(point - &self.center) * (1. / self.radius)
     }
 
-    fn get_color(&self) -> FloatPixel {
+    fn get_color(&self) -> Color {
         self.color.clone()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_sphere() {
+        let sphere = Sphere {
+            center: Point {x: 0.0, y: 0.0, z: 0.0},
+            radius: 1.0,
+            color: Color {r: 1.0, g: 0.0, b: 0.0},
+        };
+        let point_a = Point {x: 0.0, y: 1.0, z: 0.0};
+        let point_b = Point {x: 0.0, y: 0.0, z: -1.0};
+
+        assert_eq!(
+            sphere.compute_normal(&point_a).normalize(),
+            Vec3 { x: 0.0, y: 1.0, z: 0.0}
+        );
+
+        assert_eq!(
+            sphere.compute_normal(&point_b).normalize(),
+            Vec3 { x: 0.0, y: 0.0, z: -1.0}
+        );
+
+        let ray_a = Ray {
+            origin: Point {x: 0.0, y: 0.0, z: -5.0},
+            direction: Vec3 { x: 0.0, y: 0.0, z: 1.0 }
+        };
+        let ray_b = Ray {
+            origin: Point {x: 0.0, y: 0.0, z: -(2.0_f32.sqrt())},
+            direction: Vec3 { x: 0.0, y: 1.0 / 2.0_f32.sqrt(), z: 1.0 / 2.0_f32.sqrt() }
+        };
+        assert_eq!(sphere.compute_hit(&ray_a), Some(4.0));
+        assert!(approx_eq!(f32, sphere.compute_hit(&ray_b).unwrap(), 1.0));
+    }
+
+    #[test]
+    fn test_viewing_plane() {
+        let vp = ViewingPlane {
+            z: 0.0,
+            x_min: -2.0,
+            x_max: 2.0,
+            y_min: -1.5,
+            y_max: 1.5,
+            width: 640,
+            height: 480,
+        };
+
+        assert_eq!(vp.generate_uv_coords(0, 0), (-1.996875, -1.496875));
+        assert_eq!(vp.generate_uv_coords(320, 240), (0.0031249523, 0.0031249523));
+        assert_eq!(vp.generate_uv_coords(640, 480), (2.0031252, 1.503125));
     }
 }

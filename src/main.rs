@@ -3,6 +3,7 @@ extern crate nannou;
 extern crate derive_more;
 
 use nannou::prelude::*;
+#[macro_use] extern crate float_cmp;
 
 mod render;
 mod scene;
@@ -37,7 +38,7 @@ fn view(app: &App, model: &Model, frame: Frame) {
     // TODO: there must be some event that we can subscribe on
     // which would allow us to get rid of mutable statics
     unsafe {
-        if (app.time.floor() as u32 != LAST_SEC) {
+        if app.time.floor() as u32 != LAST_SEC {
             println!("FPS: {}", NUM_FRAMES_SINCE_LAST_SEC);
 
             LAST_SEC = app.time.floor() as u32;
