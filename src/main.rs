@@ -7,6 +7,8 @@ use nannou::prelude::*;
 mod render;
 mod scene;
 
+static mut NUM_FRAMES_SINCE_LAST_SEC: u32 = 0;
+static mut LAST_SEC: u32 = 0;
 
 fn main() {
     nannou::app(model).run();
@@ -32,7 +34,18 @@ fn view(app: &App, model: &Model, frame: Frame) {
 
     draw.texture(&model.texture);
 
-    println!("{}", app.time);
+    // TODO: there must be some event that we can subscribe on
+    // which would allow us to get rid of mutable statics
+    unsafe {
+        if (app.time.floor() as u32 != LAST_SEC) {
+            println!("FPS: {}", NUM_FRAMES_SINCE_LAST_SEC);
+
+            LAST_SEC = app.time.floor() as u32;
+            NUM_FRAMES_SINCE_LAST_SEC = 0;
+        } else {
+            NUM_FRAMES_SINCE_LAST_SEC += 1;
+        }
+    }
 
     draw.to_frame(app, &frame).unwrap();
 }

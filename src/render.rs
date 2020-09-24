@@ -1,6 +1,6 @@
 use nannou::image::{DynamicImage, ImageBuffer, Rgb};
 
-use crate::scene::{Scene, ViewingPlane, Sphere, Camera, FloatPixel, Point, Vec3};
+use crate::scene::{Scene, ViewingPlane, Sphere, Camera, FloatPixel, Point};
 
 
 pub fn render() -> DynamicImage {
