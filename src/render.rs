@@ -1,18 +1,22 @@
 use nannou::image::{DynamicImage, ImageBuffer, Rgb};
 
-use crate::scene::{Scene, ViewingPlane, Sphere, Camera, Color, Point, Light};
+use crate::scene::{Scene, ViewingPlane, Sphere, Camera, Color, Point, Light, Plane};
 
 
 pub fn render() -> DynamicImage {
     let width = 640;
     let height = 480;
+    let plane = Plane::from_y(-1.5, Color {r: 0.5, g: 0.5, b: 0.5});
 
     let scene = Scene {
-        objects: vec![&Sphere {
-            center: Point {x: 0.2, y: 0.2, z: 0.0},
-            radius: 0.5,
-            color: Color {r: 1.0, g: 0.0, b: 0.0},
-        }],
+        objects: vec![
+            &Sphere {
+                center: Point {x: 0.2, y: 0.2, z: 0.0},
+                radius: 0.5,
+                color: Color {r: 1.0, g: 0.0, b: 0.0},
+            },
+            &plane,
+        ],
         camera: Camera::from_z_position(-5.0),
         viewing_plane: ViewingPlane {
             z: 0.0,

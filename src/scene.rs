@@ -263,6 +263,52 @@ impl Surface for Sphere {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct Plane {
+    pub bias: Point,
+    pub normal: Vec3,
+    pub color: Color,
+}
+
+impl Plane {
+    pub fn from_y(y: f32, color: Color) -> Plane {
+        // Creates a horizontal plane
+        Plane {
+            bias: Point {x: 0.0, z: 0.0, y: y},
+            normal: Vec3 {x: 0.0, y: 1.0, z: 0.0},
+            color: color
+        }
+    }
+}
+
+impl Surface for Plane {
+    fn compute_hit(&self, ray: &Ray) -> Option<f32> {
+        let denom = self.normal.dot_product(&ray.direction);
+
+        if denom == 0.0 {
+            return None;
+        }
+
+        let num = (&self.bias - &ray.origin).dot_product(&self.normal);
+        let t = num / denom;
+
+        if t >= 0.0 {
+            Some(t)
+        } else {
+            None
+        }
+    }
+
+    fn compute_normal(&self, _point: &Point) -> Vec3 {
+        self.normal.clone()
+    }
+
+    fn get_color(&self) -> Color {
+        self.color.clone()
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -294,6 +340,7 @@ mod tests {
         let ray_b = Ray {
             origin: Point {x: 0.0, y: 0.0, z: -(2.0_f32.sqrt())},
             direction: Vec3 { x: 0.0, y: 1.0 / 2.0_f32.sqrt(), z: 1.0 / 2.0_f32.sqrt() }
+            // direction: (&Vec3 { x: 0.0, y: 1.0, z: 1.0 }).normalize()
         };
         assert_eq!(sphere.compute_hit(&ray_a), Some(4.0));
         assert!(approx_eq!(f32, sphere.compute_hit(&ray_b).unwrap(), 1.0));
