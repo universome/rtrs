@@ -1,9 +1,19 @@
 use nannou::image::{DynamicImage, ImageBuffer, Rgb};
 
-use crate::scene::{Scene, ViewingPlane, Sphere, Camera, Color, Point, Light, Plane};
+use crate::scene::{
+    Scene,
+    ViewingPlane,
+    Sphere,
+    Camera,
+    Color,
+    Point,
+    Light,
+    Plane,
+    ProjectionType,
+};
 
 
-pub fn render(width: u32, height: u32) -> DynamicImage {
+pub fn render(width: u32, height: u32, projection_type: ProjectionType) -> DynamicImage {
     let plane = Plane::from_y(-1.4, Color {r: 0.5, g: 0.5, b: 0.5});
 
     let scene = Scene {
@@ -20,7 +30,7 @@ pub fn render(width: u32, height: u32) -> DynamicImage {
             },
             &plane,
         ],
-        camera: Camera::from_z_position(-10.0),
+        camera: Camera::from_z_position(-10.0, projection_type),
         viewing_plane: ViewingPlane {
             z: 0.0,
             x_min: -2.0,
@@ -42,8 +52,6 @@ pub fn render(width: u32, height: u32) -> DynamicImage {
     let image_buf = ImageBuffer::from_fn(width, height, |i: u32, j: u32| -> Rgb<u8> {
         scene.compute_pixel(i, height - j).into()
     });
-
-    // image::save_buffer_with_format(&Path::new("image.png"), buffer, 800, 600, image::RGBA(8))
 
     DynamicImage::ImageRgb8(image_buf)
 }

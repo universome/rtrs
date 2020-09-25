@@ -8,8 +8,12 @@ use nannou::prelude::*;
 mod render;
 mod scene;
 
+use scene::{ProjectionType};
+
+
 static mut NUM_FRAMES_SINCE_LAST_SEC: u32 = 0;
 static mut LAST_SEC: u32 = 0;
+
 
 fn main() {
     nannou::app(model).run();
@@ -20,14 +24,14 @@ struct Model {
 }
 
 fn model(app: &App) -> Model {
-    // let width = 640;
-    // let height = 480;
-    let width = 1280;
-    let height = 960;
+    let width = 640;
+    let height = 480;
+    // let width = 1280;
+    // let height = 960;
 
     app.new_window().size(width, height).view(view).build().unwrap();
 
-    let img = render::render(width, height);
+    let img = render::render(width, height, ProjectionType::Parallel);
 
     unsafe {
         if NUM_FRAMES_SINCE_LAST_SEC == 0 {

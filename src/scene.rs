@@ -90,29 +90,41 @@ pub struct Light {
 }
 
 #[derive(Debug, Clone)]
+pub enum ProjectionType {Parallel, Perspective}
+
+#[derive(Debug, Clone)]
 pub struct Camera {
     origin: Point,
     direction: Vec3,
     up: Vec3,
     right: Vec3,
+    projection_type: ProjectionType
 }
 
 impl Camera {
-    pub fn from_z_position(z: f32) -> Camera {
+    pub fn from_z_position(z: f32, projection_type: ProjectionType) -> Camera {
         Camera {
             origin: Point {x: 0.0, y: 0.0, z: z},
             direction: Vec3 {x: 0.0, y: 0.0, z: -1.0},
             up: Vec3 {x: 0.0, y: 1.0, z: 0.0},
             right: Vec3 {x: 1.0, y: 0.0, z: 0.0},
+            projection_type: projection_type
         }
     }
 
     pub fn generate_ray(&self, u: f32, v: f32, viewing_plane: &ViewingPlane) -> Ray {
         let d = viewing_plane.z - self.origin.z;
-        Ray {
-            // TODO: actually, we do not need to clone anything here, right?
-            origin: self.origin.clone(),
-            direction: &self.direction * (-d) + &self.right * u + &self.up * v
+
+        match self.projection_type {
+            ProjectionType::Perspective => Ray {
+                // TODO: actually, we do not need to clone anything here, right?
+                origin: self.origin.clone(),
+                direction: &self.direction * (-d) + &self.right * u + &self.up * v
+            },
+            ProjectionType::Parallel => Ray {
+                origin: (&self.origin + &(&self.right * u) + &self.up * v).into(),
+                direction: &self.direction * (-1.0),
+            }
         }
     }
 }
