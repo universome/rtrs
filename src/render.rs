@@ -39,20 +39,22 @@ pub fn render(width: u32, height: u32) -> DynamicImage {
         diffuse_strength: 0.7,
     };
 
-    let image_buf = ImageBuffer::from_fn(width, height, |i: u32, j: u32| -> Rgb<u16> {
+    let image_buf = ImageBuffer::from_fn(width, height, |i: u32, j: u32| -> Rgb<u8> {
         scene.compute_pixel(i, height - j).into()
     });
 
-    DynamicImage::ImageRgb16(image_buf)
+    // image::save_buffer_with_format(&Path::new("image.png"), buffer, 800, 600, image::RGBA(8))
+
+    DynamicImage::ImageRgb8(image_buf)
 }
 
 
-impl From<Color> for Rgb<u16> {
+impl From<Color> for Rgb<u8> {
     fn from(pixel: Color) -> Self {
         Rgb([
-            (pixel.r * (u16::MAX - 1) as f32 ) as u16,
-            (pixel.g * (u16::MAX - 1) as f32 ) as u16,
-            (pixel.b * (u16::MAX - 1) as f32 ) as u16,
+            (pixel.r * (u8::MAX - 1) as f32 ) as u8,
+            (pixel.g * (u8::MAX - 1) as f32 ) as u8,
+            (pixel.b * (u8::MAX - 1) as f32 ) as u8,
         ])
     }
 }

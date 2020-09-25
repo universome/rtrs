@@ -20,12 +20,21 @@ struct Model {
 }
 
 fn model(app: &App) -> Model {
-    let width = 640;
-    let height = 480;
+    // let width = 640;
+    // let height = 480;
+    let width = 1280;
+    let height = 960;
 
     app.new_window().size(width, height).view(view).build().unwrap();
 
     let img = render::render(width, height);
+
+    unsafe {
+        if NUM_FRAMES_SINCE_LAST_SEC == 0 {
+           img.save("image.tga").unwrap();
+        }
+    }
+
     let texture = wgpu::Texture::from_image(app, &img);
 
     Model { texture }
