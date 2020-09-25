@@ -24,7 +24,7 @@ pub fn render(width: u32, height: u32, projection_type: ProjectionType) -> Dynam
                 color: Color {r: 1.0, g: 0.0, b: 0.0},
             },
             &Sphere {
-                center: Point {x: -1.0, y: 0.0, z: 1.0},
+                center: Point {x: 0.0, y: 0.0, z: 0.0},
                 radius: 0.5,
                 color: Color {r: 1.0, g: 0.0, b: 0.0},
             },
@@ -41,10 +41,16 @@ pub fn render(width: u32, height: u32, projection_type: ProjectionType) -> Dynam
             height: height,
         },
         background_color: Color { r: 0.2, g: 0.5, b: 0.2},
-        lights: vec![Light {
-            location: Point {x: 0.0, y: 5.0, z: 0.0},
-            color: Color {r: 1.0, g: 1.0, b: 1.0},
-        }],
+        lights: vec![
+            Light {
+                location: Point {x: 0.0, y: 3.0, z: 0.0},
+                color: Color {r: 1.0, g: 1.0, b: 1.0},
+            },
+            // Light {
+            //     location: Point {x: -3.0, y: 0.0, z: 0.0},
+            //     color: Color {r: 1.0, g: 1.0, b: 1.0},
+            // },
+        ],
         ambient_strength: 0.3,
         diffuse_strength: 0.7,
     };
@@ -58,11 +64,11 @@ pub fn render(width: u32, height: u32, projection_type: ProjectionType) -> Dynam
 
 
 impl From<Color> for Rgb<u8> {
-    fn from(pixel: Color) -> Self {
+    fn from(color: Color) -> Self {
         Rgb([
-            (pixel.r * (u8::MAX - 1) as f32 ) as u8,
-            (pixel.g * (u8::MAX - 1) as f32 ) as u8,
-            (pixel.b * (u8::MAX - 1) as f32 ) as u8,
+            (color.r * (u8::MAX - 1) as f32) as u8,
+            (color.g * (u8::MAX - 1) as f32) as u8,
+            (color.b * (u8::MAX - 1) as f32) as u8,
         ])
     }
 }

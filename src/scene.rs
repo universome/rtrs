@@ -4,25 +4,47 @@ use std::fmt::Debug;
 use derive_more::{Add, Sub};
 
 
-static MIN_RAY_T: f32 = 0.001;
+static MIN_RAY_T: f32 = 0.0001;
 
 
-#[derive(Debug, Clone, Add)]
+#[derive(Debug, Clone)]
 pub struct Color {
     pub r: f32,
     pub g: f32,
     pub b: f32,
 }
 
+impl Color {
+    pub fn clamp(&self) -> Color {
+        Color {
+            r: self.r.max(0.0).min(1.0),
+            g: self.g.max(0.0).min(1.0),
+            b: self.b.max(0.0).min(1.0),
+        }
+    }
+}
+
 impl ops::Mul<f32> for &Color {
     type Output = Color;
 
     fn mul(self, strength: f32) -> Color {
-        Color {
+        (Color {
             r: self.r * strength,
             g: self.g * strength,
             b: self.b * strength,
-        }
+        }).clamp()
+    }
+}
+
+impl ops::Add<&Color> for &Color {
+    type Output = Color;
+
+    fn add(self, other: &Color) -> Color {
+        (Color {
+            r: self.r + other.r,
+            g: self.g + other.g,
+            b: self.b + other.b,
+        }).clamp()
     }
 }
 
@@ -55,25 +77,36 @@ impl Scene<'_> {
         if closest_obj.is_some() {
             let obj = closest_obj.unwrap();
             let mut color = &obj.get_color() * self.ambient_strength;
-            let ray_hit_point = ray.compute_point(min_t);
-            let normal = obj.compute_normal(&ray_hit_point);
+            let point = ray.compute_point(min_t);
+            let normal = obj.compute_normal(&point);
 
             for light in self.lights.iter() {
-                let light_dir = (&light.location - &ray_hit_point).normalize();
+                let light_dir = (&light.location - &point);
                 let shadow_ray = Ray {
-                    origin: ray_hit_point.clone(),
-                    direction: light_dir.clone()
+                    origin: point.clone(),
+                    direction: light_dir.clone(),
                 };
+                // let max_shadow_t = (&light.location - &point).norm();
 
+                // if let Some(hit_obj) = self.objects.iter()
+                //     .filter(|o| !ptr::eq(*o, obj))
+                //     // .any(|o| o.compute_hit(&shadow_ray).filter(|t| t <= &1.0).is_some()) {
+                //     // .any(|o| o.compute_hit(&shadow_ray).is_some()) {
+                //     .find(|o| o.compute_hit(&shadow_ray).filter(|t| t <= &1.0).is_some()) {
+                //     if i == 194 && j == 185 {
+                //         println!("Is shadowed from {:?} by {:?}", light, hit_obj);
+                //     }
+                //         continue;
+                // }
                 if self.objects.iter()
-                    .filter(|o| !ptr::eq(o, &obj))
-                    .any(|o| o.compute_hit(&shadow_ray).is_some()) {
-                        break;
+                    .filter(|o| !ptr::eq(*o, obj))
+                    .any(|o| o.compute_hit(&shadow_ray).filter(|t| t <= &1.0).is_some()) {
+                        continue;
                 }
 
-                let strength = normal.dot_product(&light_dir).max(0.0);
+                let strength = normal.dot_product(&light_dir.normalize());
 
-                color = color + &light.color * strength;
+                color = (&color + &(&light.color * (strength * self.diffuse_strength))).clamp();
             }
 
             color

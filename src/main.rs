@@ -10,7 +10,10 @@ mod scene;
 
 use scene::{ProjectionType};
 
-
+static WIDTH: u32 = 640;
+static HEIGHT: u32 = 480;
+// static WIDTH: u32 = 1280;
+// static HEIGHT: u32 = 960;
 static mut NUM_FRAMES_SINCE_LAST_SEC: u32 = 0;
 static mut LAST_SEC: u32 = 0;
 
@@ -19,37 +22,32 @@ fn main() {
     nannou::app(model).run();
 }
 
-struct Model {
-    texture: wgpu::Texture,
-}
+// struct Model {
+//     texture: wgpu::Texture,
+// }
+struct Model {}
 
 fn model(app: &App) -> Model {
-    let width = 640;
-    let height = 480;
-    // let width = 1280;
-    // let height = 960;
+    app.new_window().size(WIDTH, HEIGHT).view(view).build().unwrap();
 
-    app.new_window().size(width, height).view(view).build().unwrap();
-
-    let img = render::render(width, height, ProjectionType::Parallel);
-
-    unsafe {
-        if NUM_FRAMES_SINCE_LAST_SEC == 0 {
-           img.save("image.tga").unwrap();
-        }
-    }
-
-    let texture = wgpu::Texture::from_image(app, &img);
-
-    Model { texture }
+    Model {}
 }
 
 fn view(app: &App, model: &Model, frame: Frame) {
     frame.clear(BLACK);
 
     let draw = app.draw();
+    let img = render::render(WIDTH, HEIGHT, ProjectionType::Perspective);
 
-    draw.texture(&model.texture);
+    unsafe {
+        if NUM_FRAMES_SINCE_LAST_SEC == 0 && LAST_SEC % 10 == 0 {
+           img.save("image.tga").unwrap();
+        }
+    }
+
+    let texture = wgpu::Texture::from_image(app, &img);
+
+    draw.texture(&texture);
 
     // TODO: there must be some event that we can subscribe on
     // which would allow us to get rid of mutable statics
@@ -63,6 +61,8 @@ fn view(app: &App, model: &Model, frame: Frame) {
             NUM_FRAMES_SINCE_LAST_SEC += 1;
         }
     }
+
+    println!("Time: {}", app.time);
 
     draw.to_frame(app, &frame).unwrap();
 }
