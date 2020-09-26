@@ -24,30 +24,32 @@ pub struct Sphere {
 impl Surface for Sphere {
     fn compute_hit(&self, ray: &Ray) -> Option<f32> {
         // debug_assert!(is_unit_length(ray.direction));
-        let orig_to_c = &ray.origin - &self.center;
-        let d_lhs = ray.direction.dot_product(&orig_to_c).powi(2);
-        let d_rhs = ray.direction.norm_squared() * (orig_to_c.norm_squared() - self.radius.powi(2));
-        let discriminant = d_lhs - d_rhs;
+        let orig_to_c = &self.center - &ray.origin;
+        let roots = find_roots(
+            ray.direction.norm_squared(),
+            -2.0 * ray.direction.dot_product(&orig_to_c),
+            orig_to_c.norm_squared() - self.radius * self.radius,
+        )?;
 
-        if discriminant < 0.0 {
-            return None;
+        if roots.1.is_none() && roots.0 >= MIN_RAY_T {
+            return Some(roots.0);
         }
 
-        let t;
-        let num_lhs = -ray.direction.dot_product(&orig_to_c);
-        let denom = ray.direction.norm_squared();
+        let (t0, t1) = (roots.0, roots.1.unwrap());
 
-        if discriminant == 0.0 {
-            t = num_lhs / denom;
+        if t0 < MIN_RAY_T {
+            if t1 < MIN_RAY_T {
+                None
+            } else {
+                Some(t1)
+            }
         } else {
-            let discr_sqrt = discriminant.sqrt();
-            t = match num_lhs < discr_sqrt {
-                true => (num_lhs + discr_sqrt) / denom,
-                false => (num_lhs - discr_sqrt) / denom,
-            };
+            if t1 < MIN_RAY_T {
+                Some(t0)
+            } else {
+                Some(t0.min(t1))
+            }
         }
-
-        if t >= MIN_RAY_T { Some(t) } else { None }
     }
 
     fn compute_normal(&self, point: &Point) -> Vec3 {
@@ -107,4 +109,26 @@ impl Surface for Plane {
     }
 
     fn get_specular_strength(&self) -> f32 { 0.0 }
+}
+
+
+#[inline]
+fn find_roots(a: f32, b: f32, c: f32) -> Option<(f32, Option<f32>)> {
+    // Finds roots of a quadratic equation
+    let discr = b * b - 4.0 * a * c;
+
+    if discr < 0.0 {
+        return None;
+    }
+
+    if discr == 0.0 {
+        Some((-b / (2.0 * a), None))
+    } else {
+        let discr_sqrt = discr.sqrt();
+
+        Some((
+            (-b - discr_sqrt) / (2.0 * a),
+            Some((-b + discr_sqrt) / (2.0 * a)),
+        ))
+    }
 }
