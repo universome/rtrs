@@ -5,14 +5,21 @@ use crate::surface::*;
 use crate::basics::*;
 
 
-pub fn render(width: u32, height: u32, projection_type: ProjectionType, number_of_lights: u32) -> DynamicImage {
+pub struct RenderOptions {
+    pub projection_type: ProjectionType,
+    pub number_of_lights: u32,
+    pub camera_z_position: f32,
+}
+
+
+pub fn render(width: u32, height: u32, options: &RenderOptions) -> DynamicImage {
     let plane = Plane::from_y(-1.4, Color {r: 0.5, g: 0.5, b: 0.5});
     let mut lights = vec![Light {
         location: Point {x: 0.0, y: 3.0, z: 0.0},
         color: Color {r: 1.0, g: 1.0, b: 1.0},
     }];
 
-    if number_of_lights == 2 {
+    if options.number_of_lights == 2 {
         lights.push(Light {
             location: Point {x: -3.0, y: 0.0, z: 0.0},
             color: Color {r: 1.0, g: 1.0, b: 1.0},
@@ -35,7 +42,7 @@ pub fn render(width: u32, height: u32, projection_type: ProjectionType, number_o
             },
             &plane,
         ],
-        camera: Camera::from_z_position(-10.0, projection_type),
+        camera: Camera::from_z_position(options.camera_z_position, options.projection_type),
         viewing_plane: ViewingPlane {
             z: 0.0,
             x_min: -2.0,

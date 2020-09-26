@@ -73,7 +73,7 @@ impl Scene<'_> {
 }
 
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum ProjectionType {Parallel, Perspective}
 
 #[derive(Debug, Clone)]
