@@ -7,6 +7,8 @@ use nannou::prelude::*;
 
 mod render;
 mod scene;
+mod basics;
+mod surface;
 
 use scene::{ProjectionType};
 
@@ -22,22 +24,50 @@ fn main() {
     nannou::app(model).run();
 }
 
-// struct Model {
-//     texture: wgpu::Texture,
-// }
-struct Model {}
+struct Model {
+    projection_type: ProjectionType,
+    number_of_lights: u32,
+}
 
 fn model(app: &App) -> Model {
-    app.new_window().size(WIDTH, HEIGHT).view(view).build().unwrap();
+    app.new_window().event(update).size(WIDTH, HEIGHT).view(view).build().unwrap();
 
-    Model {}
+    Model {
+        projection_type: ProjectionType::Perspective,
+        number_of_lights: 1,
+    }
 }
+
+
+fn update(_app: &App, model: &mut Model, event: WindowEvent) {
+    match event {
+        KeyReleased(key) => {
+            match key {
+                Key::L => {
+                    model.number_of_lights = model.number_of_lights % 2 + 1;
+                },
+                Key::P => {
+                    model.projection_type = match model.projection_type {
+                        ProjectionType::Parallel => ProjectionType::Perspective,
+                        ProjectionType::Perspective => ProjectionType::Parallel,
+                    };
+                },
+                _ => {},
+            }
+        }
+        // MousePressed(_button) => {
+        //     println!("global scope: GLOBAL = {}", GLOBAL);
+        // }
+        _ => (),
+    }
+}
+
 
 fn view(app: &App, model: &Model, frame: Frame) {
     frame.clear(BLACK);
 
     let draw = app.draw();
-    let img = render::render(WIDTH, HEIGHT, ProjectionType::Perspective);
+    let img = render::render(WIDTH, HEIGHT, model.projection_type.clone(), model.number_of_lights);
 
     unsafe {
         if NUM_FRAMES_SINCE_LAST_SEC == 0 && LAST_SEC % 10 == 0 {

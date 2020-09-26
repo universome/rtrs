@@ -1,52 +1,8 @@
-use std::ops;
 use std::ptr;
-use std::fmt::Debug;
-use derive_more::{Add, Sub};
 
+use crate::surface::*;
+use crate::basics::*;
 
-static MIN_RAY_T: f32 = 0.0001;
-
-
-#[derive(Debug, Clone)]
-pub struct Color {
-    pub r: f32,
-    pub g: f32,
-    pub b: f32,
-}
-
-impl Color {
-    pub fn clamp(&self) -> Color {
-        Color {
-            r: self.r.max(0.0).min(1.0),
-            g: self.g.max(0.0).min(1.0),
-            b: self.b.max(0.0).min(1.0),
-        }
-    }
-}
-
-impl ops::Mul<f32> for &Color {
-    type Output = Color;
-
-    fn mul(self, strength: f32) -> Color {
-        (Color {
-            r: self.r * strength,
-            g: self.g * strength,
-            b: self.b * strength,
-        }).clamp()
-    }
-}
-
-impl ops::Add<&Color> for &Color {
-    type Output = Color;
-
-    fn add(self, other: &Color) -> Color {
-        (Color {
-            r: self.r + other.r,
-            g: self.g + other.g,
-            b: self.b + other.b,
-        }).clamp()
-    }
-}
 
 pub struct Scene<'a> {
     pub objects: Vec<&'a dyn Surface>,
@@ -104,9 +60,9 @@ impl Scene<'_> {
                         continue;
                 }
 
-                let strength = normal.dot_product(&light_dir.normalize());
+                let diffuse_cos = normal.dot_product(&light_dir.normalize());
 
-                color = (&color + &(&light.color * (strength * self.diffuse_strength))).clamp();
+                color = (&color + &(&light.color * (diffuse_cos * self.diffuse_strength))).clamp();
             }
 
             color
@@ -116,11 +72,6 @@ impl Scene<'_> {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct Light {
-    pub location: Point,
-    pub color: Color,
-}
 
 #[derive(Debug, Clone)]
 pub enum ProjectionType {Parallel, Perspective}
@@ -181,198 +132,6 @@ impl ViewingPlane {
         let v = self.y_min + y_dist * (j as f32 + 0.5) / (self.height as f32);
 
         (u, v)
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct Ray {
-    pub origin: Point,
-    pub direction: Vec3
-}
-
-impl Ray {
-    pub fn compute_point(&self, t: f32) -> Point {
-        // Computes point on the ray given t value
-        (&self.origin + &(&self.direction * t)).into()
-    }
-}
-
-#[derive(Debug, Clone, Add, Sub, PartialEq)]
-pub struct Vec3 {
-    x: f32,
-    y: f32,
-    z: f32,
-}
-
-impl Vec3 {
-    pub fn normalize(&self) -> Self {
-        let norm = self.norm();
-
-        Vec3 {x: self.x / norm, y: self.y / norm, z: self.z / norm }
-    }
-
-    pub fn norm(&self) -> f32 {
-        self.norm_squared().sqrt()
-    }
-
-    pub fn norm_squared(&self) -> f32 {
-        self.x.powi(2) + self.y.powi(2) + self.z.powi(2)
-    }
-
-    pub fn dot_product(&self, other: &Self) -> f32 {
-        self.x * other.x + self.y * other.y + self.z * other.z
-    }
-
-    pub fn cross_product(&self, other: &Self) -> Vec3 {
-        Vec3 {
-            x: self.y * other.z - self.z * other.y,
-            y: self.z * other.x - self.x * other.z,
-            z: self.x * other.y - self.y * other.x,
-        }
-    }
-}
-
-
-impl ops::Mul<f32> for &Vec3 {
-    type Output = Vec3;
-
-    fn mul(self, scale: f32) -> Vec3 {
-        Vec3 {x: self.x * scale, y: self.y * scale, z: self.z * scale}
-    }
-}
-
-
-#[derive(Debug, Clone)]
-pub struct Point {
-    pub x: f32,
-    pub y: f32,
-    pub z: f32,
-}
-
-impl ops::Sub<&Point> for &Point {
-    type Output = Vec3;
-
-    fn sub(self, other: &Point) -> Vec3 {
-        Vec3 {
-            x: self.x - other.x,
-            y: self.y - other.y,
-            z: self.z - other.z,
-        }
-    }
-}
-
-impl ops::Add<&Vec3> for &Point {
-    type Output = Vec3;
-
-    fn add(self, direction: &Vec3) -> Vec3 {
-        Vec3 {
-            x: self.x + direction.x,
-            y: self.y + direction.y,
-            z: self.z + direction.z,
-        }
-    }
-}
-
-impl From<Vec3> for Point {
-    fn from(v: Vec3) -> Self {
-        Point {x: v.x, y: v.y, z: v.z}
-    }
-}
-
-
-pub trait Surface: Debug {
-    fn compute_hit(&self, ray: &Ray) -> Option<f32>;
-    fn compute_normal(&self, point: &Point) -> Vec3;
-    fn get_color(&self) -> Color;
-}
-
-#[derive(Debug, Clone)]
-pub struct Sphere {
-    pub center: Point,
-    pub radius: f32,
-    pub color: Color,
-}
-
-impl Surface for Sphere {
-    fn compute_hit(&self, ray: &Ray) -> Option<f32> {
-        // debug_assert!(is_unit_length(ray.direction));
-        let orig_to_c = &ray.origin - &self.center;
-        let d_lhs = ray.direction.dot_product(&orig_to_c).powi(2);
-        let d_rhs = ray.direction.norm_squared() * (orig_to_c.norm_squared() - self.radius.powi(2));
-        let discriminant = d_lhs - d_rhs;
-
-        if discriminant < 0.0 {
-            return None;
-        }
-
-        let t;
-        let num_lhs = -ray.direction.dot_product(&orig_to_c);
-        let denom = ray.direction.norm_squared();
-
-        if discriminant == 0.0 {
-            t = num_lhs / denom;
-        } else {
-            let discr_sqrt = discriminant.sqrt();
-            t = match num_lhs < discr_sqrt {
-                true => (num_lhs + discr_sqrt) / denom,
-                false => (num_lhs - discr_sqrt) / denom,
-            };
-        }
-
-        if t >= MIN_RAY_T { Some(t) } else { None }
-    }
-
-    fn compute_normal(&self, point: &Point) -> Vec3 {
-        &(point - &self.center) * (1. / self.radius)
-    }
-
-    fn get_color(&self) -> Color {
-        self.color.clone()
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct Plane {
-    pub bias: Point,
-    pub normal: Vec3,
-    pub color: Color,
-}
-
-impl Plane {
-    pub fn from_y(y: f32, color: Color) -> Plane {
-        // Creates a horizontal plane
-        Plane {
-            bias: Point {x: 0.0, z: 0.0, y: y},
-            normal: Vec3 {x: 0.0, y: 1.0, z: 0.0},
-            color: color
-        }
-    }
-}
-
-impl Surface for Plane {
-    fn compute_hit(&self, ray: &Ray) -> Option<f32> {
-        let denom = self.normal.dot_product(&ray.direction);
-
-        if denom == 0.0 {
-            return None;
-        }
-
-        let num = (&self.bias - &ray.origin).dot_product(&self.normal);
-        let t = num / denom;
-
-        if t >= MIN_RAY_T {
-            Some(t)
-        } else {
-            None
-        }
-    }
-
-    fn compute_normal(&self, _point: &Point) -> Vec3 {
-        self.normal.clone()
-    }
-
-    fn get_color(&self) -> Color {
-        self.color.clone()
     }
 }
 

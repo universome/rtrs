@@ -1,20 +1,23 @@
 use nannou::image::{DynamicImage, ImageBuffer, Rgb};
 
-use crate::scene::{
-    Scene,
-    ViewingPlane,
-    Sphere,
-    Camera,
-    Color,
-    Point,
-    Light,
-    Plane,
-    ProjectionType,
-};
+use crate::scene::*;
+use crate::surface::*;
+use crate::basics::*;
 
 
-pub fn render(width: u32, height: u32, projection_type: ProjectionType) -> DynamicImage {
+pub fn render(width: u32, height: u32, projection_type: ProjectionType, number_of_lights: u32) -> DynamicImage {
     let plane = Plane::from_y(-1.4, Color {r: 0.5, g: 0.5, b: 0.5});
+    let mut lights = vec![Light {
+        location: Point {x: 0.0, y: 3.0, z: 0.0},
+        color: Color {r: 1.0, g: 1.0, b: 1.0},
+    }];
+
+    if number_of_lights == 2 {
+        lights.push(Light {
+            location: Point {x: -3.0, y: 0.0, z: 0.0},
+            color: Color {r: 1.0, g: 1.0, b: 1.0},
+        });
+    }
 
     let scene = Scene {
         objects: vec![
@@ -22,11 +25,13 @@ pub fn render(width: u32, height: u32, projection_type: ProjectionType) -> Dynam
                 center: Point {x: 1.0, y: -1.5, z: 0.0},
                 radius: 0.5,
                 color: Color {r: 1.0, g: 0.0, b: 0.0},
+                specular_strength: 0.5,
             },
             &Sphere {
                 center: Point {x: 0.0, y: 0.0, z: 0.0},
                 radius: 0.5,
                 color: Color {r: 1.0, g: 0.0, b: 0.0},
+                specular_strength: 0.5,
             },
             &plane,
         ],
@@ -41,16 +46,7 @@ pub fn render(width: u32, height: u32, projection_type: ProjectionType) -> Dynam
             height: height,
         },
         background_color: Color { r: 0.2, g: 0.5, b: 0.2},
-        lights: vec![
-            Light {
-                location: Point {x: 0.0, y: 3.0, z: 0.0},
-                color: Color {r: 1.0, g: 1.0, b: 1.0},
-            },
-            // Light {
-            //     location: Point {x: -3.0, y: 0.0, z: 0.0},
-            //     color: Color {r: 1.0, g: 1.0, b: 1.0},
-            // },
-        ],
+        lights: lights,
         ambient_strength: 0.3,
         diffuse_strength: 0.7,
     };
@@ -60,15 +56,4 @@ pub fn render(width: u32, height: u32, projection_type: ProjectionType) -> Dynam
     });
 
     DynamicImage::ImageRgb8(image_buf)
-}
-
-
-impl From<Color> for Rgb<u8> {
-    fn from(color: Color) -> Self {
-        Rgb([
-            (color.r * (u8::MAX - 1) as f32) as u8,
-            (color.g * (u8::MAX - 1) as f32) as u8,
-            (color.b * (u8::MAX - 1) as f32) as u8,
-        ])
-    }
 }
