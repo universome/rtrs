@@ -38,7 +38,7 @@ pub fn render(width: u32, height: u32, options: &RenderOptions) -> DynamicImage 
                 center: Point {x: 0.0, y: 0.0, z: 0.0},
                 color: Color {r: 1.0, g: 0.0, b: 0.0},
                 specular_strength: 0.5,
-                scale: DiagMat3 {a: 1.5, b: 0.5, c: 0.5}
+                scale: DiagMat3 {a: 0.75, b: 0.5, c: 0.5}
             },
             // &Sphere {
             //     center: Point {x: 0.0, y: 0.0, z: 0.0},

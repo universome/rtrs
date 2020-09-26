@@ -119,11 +119,11 @@ impl Surface for Ellipsoid {
 
     fn compute_normal(&self, point: &Point) -> Vec3 {
         // &(point - &self.center) * (1. / self.radius)
-        Vec3 {
-            x: 2.0 * point.x / (self.scale.a * self.scale.a),
-            y: 2.0 * point.y / (self.scale.b * self.scale.b),
-            z: 2.0 * point.z / (self.scale.c * self.scale.c),
-        }
+        (Vec3 {
+            x: 2.0 * (point.x - self.center.x) / (self.scale.a * self.scale.a),
+            y: 2.0 * (point.y - self.center.y) / (self.scale.b * self.scale.b),
+            z: 2.0 * (point.z - self.center.z) / (self.scale.c * self.scale.c),
+        }).normalize()
     }
 
     fn get_color(&self) -> Color { self.color.clone() }
