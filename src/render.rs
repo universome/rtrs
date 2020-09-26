@@ -28,18 +28,24 @@ pub fn render(width: u32, height: u32, options: &RenderOptions) -> DynamicImage 
 
     let scene = Scene {
         objects: vec![
-            &Sphere {
-                center: Point {x: 1.0, y: -1.5, z: 0.0},
-                radius: 0.5,
-                color: Color {r: 1.0, g: 0.0, b: 0.0},
-                specular_strength: 0.5,
-            },
-            &Sphere {
+            // &Sphere {
+            //     center: Point {x: 1.0, y: -1.5, z: 0.0},
+            //     radius: 0.5,
+            //     color: Color {r: 1.0, g: 0.0, b: 0.0},
+            //     specular_strength: 0.5,
+            // },
+            &Ellipsoid {
                 center: Point {x: 0.0, y: 0.0, z: 0.0},
-                radius: 0.5,
                 color: Color {r: 1.0, g: 0.0, b: 0.0},
                 specular_strength: 0.5,
+                scale: DiagMat3 {a: 1.5, b: 0.5, c: 0.5}
             },
+            // &Sphere {
+            //     center: Point {x: 0.0, y: 0.0, z: 0.0},
+            //     radius: 0.5,
+            //     color: Color {r: 1.0, g: 0.0, b: 0.0},
+            //     specular_strength: 0.5,
+            // },
             &plane,
         ],
         camera: Camera::from_z_position(options.camera_z_position, options.projection_type),

@@ -158,3 +158,32 @@ impl Ray {
         (&self.origin + &(&self.direction * t)).into()
     }
 }
+
+#[derive(Debug, Clone)]
+pub struct DiagMat3 {
+    pub a: f32,
+    pub b: f32,
+    pub c: f32,
+}
+
+impl DiagMat3 {
+    pub fn compute_inverse(&self) -> DiagMat3 {
+        DiagMat3 {
+            a: 1.0 / self.a,
+            b: 1.0 / self.b,
+            c: 1.0 / self.c,
+        }
+    }
+}
+
+impl ops::Mul<&Vec3> for &DiagMat3 {
+    type Output = Vec3;
+
+    fn mul(self, vector: &Vec3) -> Vec3 {
+        Vec3 {
+            x: vector.x * self.a,
+            y: vector.y * self.b,
+            z: vector.z * self.c,
+        }
+    }
+}

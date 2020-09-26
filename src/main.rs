@@ -57,7 +57,7 @@ fn update(_app: &App, model: &mut Model, event: WindowEvent) {
                     };
                 },
                 Key::Z => {
-                    model.opts.camera_z_position = if model.opts.camera_z_position == -1.0 { -5.0 } else { -1.0 };
+                    model.opts.camera_z_position = if model.opts.camera_z_position == -1.0 { -10.0 } else { -1.0 };
                 },
                 _ => {},
             }
