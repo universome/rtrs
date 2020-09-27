@@ -1,6 +1,7 @@
 //! A simple as possible example demonstrating how to use the `draw` API to display a texture.
 extern crate nannou;
 extern crate derive_more;
+#[macro_use] extern crate itertools;
 
 use nannou::prelude::*;
 #[macro_use] extern crate float_cmp;

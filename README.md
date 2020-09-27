@@ -14,6 +14,7 @@ Additional features we have:
 - render everything "online" (instead of saving to an image)
 - multiple objects
 - unit tests
+- finite cone instead of infinite cone
 
 ### TODO
 - Ellipsoid

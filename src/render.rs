@@ -77,9 +77,15 @@ pub fn render(width: u32, height: u32, options: &RenderOptions) -> DynamicImage 
         diffuse_strength: 0.7,
     };
 
-    let image_buf = ImageBuffer::from_fn(width, height, |i: u32, j: u32| -> Rgb<u8> {
-        scene.compute_pixel(i, height - j).into()
-    });
+    let image_vec = iproduct!(0..height, 0..width)
+        .map(|p: (u32, u32)| -> Vec<u8> {
+            let color = scene.compute_pixel(p.1, height - p.0);
+            vec![(color.r * 255.0) as u8, (color.g * 255.0) as u8, (color.b * 255.0) as u8]
+        })
+        .flatten()
+        .collect::<Vec<u8>>();
+
+    let image_buf = ImageBuffer::<Rgb<u8>, Vec<u8>>::from_vec(width, height, image_vec).unwrap();
 
     DynamicImage::ImageRgb8(image_buf)
 }
