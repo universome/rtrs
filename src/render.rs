@@ -28,35 +28,29 @@ pub fn render(width: u32, height: u32, options: &RenderOptions) -> DynamicImage 
         });
     }
 
-    let sphere_a = Sphere {
-        center: Point {x: 1.0, y: -1.5, z: 0.0},
+    let sphere = Sphere {
+        center: Point {x: 1.0, y: -1.5, z: -0.5},
         radius: 0.5,
-        color: Color {r: 1.0, g: 0.0, b: 0.0},
+        color: Color {r: 0.0, g: 0.0, b: 1.0},
         specular_strength: options.specular_strength,
     };
     let ellipsoid = Ellipsoid {
         center: Point {x: 0.0, y: 0.0, z: 0.0},
         color: Color {r: 1.0, g: 0.0, b: 0.0},
         specular_strength: options.specular_strength,
-        scale: DiagMat3 {a: 0.75, b: 0.5, c: 0.5}
+        scale: DiagMat3 {a: 0.35, b: 0.25, c: 0.25}
     };
     let cone = Cone {
-        apex: Point {x: -2.0, y: -0.2, z: 2.5},
+        apex: Point {x: -2.0, y: 1.5, z: 2.5},
         half_angle: 0.5,
-        height: 0.7,
-        color: Color {r: 1.0, g: 0.0, b: 0.0},
-        specular_strength: options.specular_strength,
-    };
-    let sphere_b = Sphere {
-        center: Point {x: 0.0, y: 0.0, z: 0.0},
-        radius: 0.5,
-        color: Color {r: 1.0, g: 0.0, b: 0.0},
+        height: 0.5,
+        color: Color {r: 0.0, g: 1.0, b: 0.0},
         specular_strength: options.specular_strength,
     };
 
     let scene = Scene {
         objects: vec![
-            &sphere_a,
+            &sphere,
             &ellipsoid,
             &cone,
             // &sphere_b,
@@ -72,7 +66,7 @@ pub fn render(width: u32, height: u32, options: &RenderOptions) -> DynamicImage 
             width: width,
             height: height,
         },
-        background_color: Color { r: 0.2, g: 0.5, b: 0.2},
+        background_color: Color {r: 0.204, g: 0.596, b: 0.86},
         lights: lights,
         ambient_strength: 0.3,
         diffuse_strength: 0.7,

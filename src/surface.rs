@@ -226,8 +226,12 @@ fn find_square_roots(a: f32, b: f32, c: f32) -> Option<(f32, Option<f32>)> {
 
 #[inline]
 fn select_smallest_positive_root(roots: (f32, Option<f32>)) -> Option<f32> {
-    if roots.1.is_none() && roots.0 >= MIN_RAY_T {
-        return Some(roots.0);
+    if roots.1.is_none() {
+        if roots.0 >= MIN_RAY_T {
+            return Some(roots.0);
+        } else {
+            return None;
+        }
     }
 
     let (t0, t1) = (roots.0, roots.1.unwrap());
