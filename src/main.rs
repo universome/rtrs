@@ -1,3 +1,5 @@
+use std::time::{Instant};
+
 extern crate rayon;
 extern crate nannou;
 extern crate derive_more;
@@ -16,10 +18,10 @@ use scene::{ProjectionType};
 
 // static WIDTH: u32 = 640;
 // static HEIGHT: u32 = 480;
-static WIDTH: u32 = 800;
-static HEIGHT: u32 = 600;
-// static WIDTH: u32 = 1280;
-// static HEIGHT: u32 = 960;
+// static WIDTH: u32 = 800;
+// static HEIGHT: u32 = 600;
+static WIDTH: u32 = 1280;
+static HEIGHT: u32 = 960;
 static mut NUM_FRAMES_SINCE_LAST_SEC: u32 = 0;
 static mut LAST_SEC: u32 = 0;
 
@@ -30,6 +32,8 @@ struct Model {
 
 
 fn main() {
+    // rayon::ThreadPoolBuilder::new().num_threads(1).build_global().unwrap();
+
     nannou::app(model).run();
 }
 
@@ -38,9 +42,9 @@ fn model(app: &App) -> Model {
 
     Model {
         opts: RenderOptions {
-            projection_type: ProjectionType::Parallel,
+            projection_type: ProjectionType::Perspective,
             number_of_lights: 1,
-            camera_z_position: -10.0,
+            camera_z_position: -1.0,
             specular_strength: 0.0,
         }
     }
@@ -81,7 +85,10 @@ fn view(app: &App, model: &Model, frame: Frame) {
     frame.clear(BLACK);
 
     let draw = app.draw();
+    let start = Instant::now();
     let img = render::render(WIDTH, HEIGHT, &model.opts);
+    let duration = start.elapsed();
+    println!("Frame rendering time: {:?}", duration);
 
     unsafe {
         if NUM_FRAMES_SINCE_LAST_SEC == 0 && LAST_SEC % 10 == 0 {

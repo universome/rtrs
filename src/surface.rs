@@ -106,7 +106,6 @@ impl Surface for Ellipsoid {
     }
 
     fn compute_normal(&self, point: &Point) -> Vec3 {
-        // &(point - &self.center) * (1. / self.radius)
         (Vec3 {
             x: 2.0 * (point.x - self.center.x) / (self.scale.a * self.scale.a),
             y: 2.0 * (point.y - self.center.y) / (self.scale.b * self.scale.b),
@@ -131,23 +130,18 @@ pub struct Cone {
 
 impl Cone {
     fn compute_cone_hit(&self, ray: &Ray) -> Option<f32> {
-        let center = Point {x: self.apex.x, y: self.apex.y - self.height, z: self.apex.z};
-        let a = ray.origin.x - center.x;
-        let b = ray.origin.z - center.z;
-        let c = self.height - ray.origin.y + center.y;
-        let tan2 = self.half_angle.tanh().powi(2);
-
+        let s = self.half_angle.tanh().powi(2);
         let roots = find_square_roots(
-            ray.direction.x.powi(2) + ray.direction.z.powi(2) - ray.direction.y.powi(2) * tan2,
-            2.0 * (a * ray.direction.x + b * ray.direction.z + tan2 * c * ray.direction.y),
-            a * a + b * b - tan2 * c * c,
+            ray.direction.x.powi(2) + ray.direction.z.powi(2) - ray.direction.y.powi(2) * s,
+            2.0 * (ray.direction.x * (ray.origin.x - self.apex.x) + ray.direction.z * (ray.origin.z - self.apex.z) - s * ray.direction.y * (ray.origin.y - self.apex.y)),
+            (ray.origin.x - self.apex.x).powi(2) + (ray.origin.z - self.apex.z).powi(2) - s * (ray.origin.y - self.apex.y).powi(2),
         )?;
 
         let t = select_smallest_positive_root(roots)?;
         let py = ray.origin.y + t * ray.direction.y;
 
-        if py > center.y && py < (center.y + self.height) {
-            return Some(py);
+        if py <= self.apex.y && py >= (self.apex.y - self.height) {
+            return Some(t);
         }
 
         None
@@ -195,29 +189,11 @@ impl Surface for Cone {
         if self.lies_on_slab(point) {
             Vec3 {x: 0.0, y: -1.0, z: 0.0}
         } else {
-            // let radius = self.height * self.half_angle.tanh();
-            // let current_r = ((point.x - self.apex.x).powi(2) + (point.z - self.apex.z).powi(2)).sqrt();
-
-            // (Vec3 {
-            //     x: ((point.x - self.apex.x) / current_r) * self.height / radius,
-            //     y: radius / self.height,
-            //     z: ((point.z - self.apex.z) / current_r) * self.height / radius,
-            // }).normalize()
-
-            // let current_r = ((point.x - self.apex.x).powi(2) + (point.z - self.apex.z).powi(2)).sqrt();
-
-            // (Vec3 {
-            //     x: point.x - self.apex.x,
-            //     y: self.half_angle.tanh() * current_r,
-            //     z: point.z - self.apex.z,
-            // }).normalize()
-            // Vec3 {x: 0.0, y: 1.0, z: 0.0}
-            let cos2_alpha = self.half_angle.cos().powi(2);
-
+            let s = self.half_angle.tanh().powi(2);
             (Vec3 {
-                x: 2.0 * point.x,
-                y: -2.0 * point.y * cos2_alpha,
-                z: 2.0 * point.z,
+                x: 2.0 * (point.x - self.apex.x),
+                y: -2.0 * s * (point.y - self.apex.y),
+                z: 2.0 * (point.z - self.apex.z),
             }).normalize()
         }
     }

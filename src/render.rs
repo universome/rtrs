@@ -17,7 +17,7 @@ pub struct RenderOptions {
 pub fn render(width: u32, height: u32, options: &RenderOptions) -> DynamicImage {
     let plane = Plane::from_y(-1.4, Color {r: 0.5, g: 0.5, b: 0.5});
     let mut lights = vec![Light {
-        location: Point {x: 0.0, y: 3.0, z: 0.0},
+        location: Point {x: 0.0, y: 5.0, z: 0.0},
         color: Color {r: 1.0, g: 1.0, b: 1.0},
     }];
 
@@ -41,9 +41,9 @@ pub fn render(width: u32, height: u32, options: &RenderOptions) -> DynamicImage 
         scale: DiagMat3 {a: 0.75, b: 0.5, c: 0.5}
     };
     let cone = Cone {
-        apex: Point {x: -1.5, y: 1.0, z: 0.5},
+        apex: Point {x: -2.0, y: -0.2, z: 2.5},
         half_angle: 0.5,
-        height: 0.5,
+        height: 0.7,
         color: Color {r: 1.0, g: 0.0, b: 0.0},
         specular_strength: options.specular_strength,
     };

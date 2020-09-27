@@ -43,33 +43,12 @@ impl Scene<'_> {
                     origin: point.clone(),
                     direction: light_dir.clone(),
                 };
-                // let max_shadow_t = (&light.location - &point).norm();
 
-                // if let Some(hit_obj) = self.objects.iter()
-                //     .filter(|o| !ptr::eq(*o, obj))
-                //     // .any(|o| o.compute_hit(&shadow_ray).filter(|t| t <= &1.0).is_some()) {
-                //     // .any(|o| o.compute_hit(&shadow_ray).is_some()) {
-                //     .find(|o| o.compute_hit(&shadow_ray).filter(|t| t <= &1.0).is_some()) {
-                //     if i == 194 && j == 185 {
-                //         println!("Is shadowed from {:?} by {:?}", light, hit_obj);
-                //     }
-                //         continue;
-                // }
                 if self.objects.iter()
                     .filter(|o| !ptr::eq(*o, obj))
                     .any(|o| o.compute_hit(&shadow_ray).filter(|t| t <= &distance_to_light).is_some()) {
                         continue;
                 }
-
-                // if i == 296 && j == 412 {
-                //     println!("Ray: {:?}", &ray);
-                //     println!("Applyinh {:?}", light);
-                //     println!("Normal {:?}", &normal);
-                //     println!("Light dir {:?}", light_dir);
-                //     println!("Point: {:?}", &point);
-                //     println!("T: {:?}", min_t);
-                //     return Color {r: 1.0, g: 1.0, b: 1.0};
-                // }
 
                 let diffuse_cos = normal.dot_product(&light_dir.normalize());
                 let diffuse_light_color = &light.color * (diffuse_cos * self.diffuse_strength);
