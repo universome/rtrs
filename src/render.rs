@@ -1,3 +1,4 @@
+use rayon::prelude::*;
 use nannou::image::{DynamicImage, ImageBuffer, Rgb};
 
 use crate::scene::*;
@@ -78,10 +79,14 @@ pub fn render(width: u32, height: u32, options: &RenderOptions) -> DynamicImage 
     };
 
     let image_vec = iproduct!(0..height, 0..width)
-        .map(|p: (u32, u32)| -> Vec<u8> {
+        .collect::<Vec<(u32, u32)>>()
+        .par_iter()
+        .map(|p: &(u32, u32)| -> Vec<u8> {
             let color = scene.compute_pixel(p.1, height - p.0);
             vec![(color.r * 255.0) as u8, (color.g * 255.0) as u8, (color.b * 255.0) as u8]
         })
+        .collect::<Vec<Vec<u8>>>()
+        .into_iter()
         .flatten()
         .collect::<Vec<u8>>();
 

@@ -1,4 +1,4 @@
-//! A simple as possible example demonstrating how to use the `draw` API to display a texture.
+extern crate rayon;
 extern crate nannou;
 extern crate derive_more;
 #[macro_use] extern crate itertools;

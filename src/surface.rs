@@ -1,3 +1,4 @@
+use std::marker::Sync;
 use std::fmt::Debug;
 use crate::basics::*;
 
@@ -5,7 +6,7 @@ use crate::basics::*;
 static MIN_RAY_T: f32 = 0.0001;
 
 
-pub trait Surface: Debug {
+pub trait Surface: Debug + Sync {
     fn compute_hit(&self, ray: &Ray) -> Option<f32>;
     fn compute_normal(&self, point: &Point) -> Vec3;
     fn get_color(&self) -> Color;
