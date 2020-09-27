@@ -37,7 +37,8 @@ impl Scene<'_> {
             let normal = obj.compute_normal(&point);
 
             for light in self.lights.iter() {
-                let light_dir = (&light.location - &point);
+                let distance_to_light = (&light.location - &point).norm();
+                let light_dir = (&light.location - &point).normalize();
                 let shadow_ray = Ray {
                     origin: point.clone(),
                     direction: light_dir.clone(),
@@ -56,13 +57,30 @@ impl Scene<'_> {
                 // }
                 if self.objects.iter()
                     .filter(|o| !ptr::eq(*o, obj))
-                    .any(|o| o.compute_hit(&shadow_ray).filter(|t| t <= &1.0).is_some()) {
+                    .any(|o| o.compute_hit(&shadow_ray).filter(|t| t <= &distance_to_light).is_some()) {
                         continue;
                 }
 
-                let diffuse_cos = normal.dot_product(&light_dir.normalize());
+                // if i == 296 && j == 412 {
+                //     println!("Ray: {:?}", &ray);
+                //     println!("Applyinh {:?}", light);
+                //     println!("Normal {:?}", &normal);
+                //     println!("Light dir {:?}", light_dir);
+                //     println!("Point: {:?}", &point);
+                //     println!("T: {:?}", min_t);
+                //     return Color {r: 1.0, g: 1.0, b: 1.0};
+                // }
 
-                color = (&color + &(&light.color * (diffuse_cos * self.diffuse_strength))).clamp();
+                let diffuse_cos = normal.dot_product(&light_dir.normalize());
+                let diffuse_light_color = &light.color * (diffuse_cos * self.diffuse_strength);
+
+                // Specular light componen
+                let eye_dir = (&self.camera.origin - &point).normalize();
+                let half_vector = (eye_dir + light_dir).normalize();
+                let spec_strength = obj.get_specular_strength() * normal.dot_product(&half_vector).max(0.0).powf(64.0);
+                let spec_color = (&Color {r: 1.0, g: 1.0, b: 1.0}) * spec_strength;
+
+                color = (&(&color + &diffuse_light_color) + &spec_color).clamp();
             }
 
             color

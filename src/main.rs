@@ -13,8 +13,10 @@ mod surface;
 use render::{RenderOptions};
 use scene::{ProjectionType};
 
-static WIDTH: u32 = 640;
-static HEIGHT: u32 = 480;
+// static WIDTH: u32 = 640;
+// static HEIGHT: u32 = 480;
+static WIDTH: u32 = 800;
+static HEIGHT: u32 = 600;
 // static WIDTH: u32 = 1280;
 // static HEIGHT: u32 = 960;
 static mut NUM_FRAMES_SINCE_LAST_SEC: u32 = 0;
@@ -35,9 +37,10 @@ fn model(app: &App) -> Model {
 
     Model {
         opts: RenderOptions {
-            projection_type: ProjectionType::Perspective,
+            projection_type: ProjectionType::Parallel,
             number_of_lights: 1,
-            camera_z_position: -1.0,
+            camera_z_position: -10.0,
+            specular_strength: 0.0,
         }
     }
 }
@@ -58,6 +61,9 @@ fn update(_app: &App, model: &mut Model, event: WindowEvent) {
                 },
                 Key::Z => {
                     model.opts.camera_z_position = if model.opts.camera_z_position == -1.0 { -10.0 } else { -1.0 };
+                },
+                Key::S => {
+                    model.opts.specular_strength = if model.opts.specular_strength == 0.0 { 0.5 } else { 0.0 };
                 },
                 _ => {},
             }

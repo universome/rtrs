@@ -203,12 +203,20 @@ impl Surface for Cone {
             //     z: ((point.z - self.apex.z) / current_r) * self.height / radius,
             // }).normalize()
 
-            let current_r = ((point.x - self.apex.x).powi(2) + (point.z - self.apex.z).powi(2)).sqrt();
+            // let current_r = ((point.x - self.apex.x).powi(2) + (point.z - self.apex.z).powi(2)).sqrt();
+
+            // (Vec3 {
+            //     x: point.x - self.apex.x,
+            //     y: self.half_angle.tanh() * current_r,
+            //     z: point.z - self.apex.z,
+            // }).normalize()
+            // Vec3 {x: 0.0, y: 1.0, z: 0.0}
+            let cos2_alpha = self.half_angle.cos().powi(2);
 
             (Vec3 {
-                x: point.x - self.apex.x,
-                y: self.half_angle.tanh() * current_r,
-                z: point.z - self.apex.z,
+                x: 2.0 * point.x,
+                y: -2.0 * point.y * cos2_alpha,
+                z: 2.0 * point.z,
             }).normalize()
         }
     }

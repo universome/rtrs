@@ -4,11 +4,12 @@ use crate::scene::*;
 use crate::surface::*;
 use crate::basics::*;
 
-
+#[derive(Debug, Copy, Clone)]
 pub struct RenderOptions {
     pub projection_type: ProjectionType,
     pub number_of_lights: u32,
     pub camera_z_position: f32,
+    pub specular_strength: f32,
 }
 
 
@@ -26,33 +27,38 @@ pub fn render(width: u32, height: u32, options: &RenderOptions) -> DynamicImage 
         });
     }
 
+    let sphere_a = Sphere {
+        center: Point {x: 1.0, y: -1.5, z: 0.0},
+        radius: 0.5,
+        color: Color {r: 1.0, g: 0.0, b: 0.0},
+        specular_strength: options.specular_strength,
+    };
+    let ellipsoid = Ellipsoid {
+        center: Point {x: 0.0, y: 0.0, z: 0.0},
+        color: Color {r: 1.0, g: 0.0, b: 0.0},
+        specular_strength: options.specular_strength,
+        scale: DiagMat3 {a: 0.75, b: 0.5, c: 0.5}
+    };
+    let cone = Cone {
+        apex: Point {x: -1.5, y: 1.0, z: 0.5},
+        half_angle: 0.5,
+        height: 0.5,
+        color: Color {r: 1.0, g: 0.0, b: 0.0},
+        specular_strength: options.specular_strength,
+    };
+    let sphere_b = Sphere {
+        center: Point {x: 0.0, y: 0.0, z: 0.0},
+        radius: 0.5,
+        color: Color {r: 1.0, g: 0.0, b: 0.0},
+        specular_strength: options.specular_strength,
+    };
+
     let scene = Scene {
         objects: vec![
-            // &Sphere {
-            //     center: Point {x: 1.0, y: -1.5, z: 0.0},
-            //     radius: 0.5,
-            //     color: Color {r: 1.0, g: 0.0, b: 0.0},
-            //     specular_strength: 0.5,
-            // },
-            // &Ellipsoid {
-            //     center: Point {x: 0.0, y: 0.0, z: 0.0},
-            //     color: Color {r: 1.0, g: 0.0, b: 0.0},
-            //     specular_strength: 0.5,
-            //     scale: DiagMat3 {a: 0.75, b: 0.5, c: 0.5}
-            // },
-            &Cone {
-                apex: Point {x: -0.5, y: 1.0, z: 0.5},
-                half_angle: 0.5,
-                height: 0.5,
-                color: Color {r: 1.0, g: 0.0, b: 0.0},
-                specular_strength: 0.5,
-            },
-            // &Sphere {
-            //     center: Point {x: 0.0, y: 0.0, z: 0.0},
-            //     radius: 0.5,
-            //     color: Color {r: 1.0, g: 0.0, b: 0.0},
-            //     specular_strength: 0.5,
-            // },
+            &sphere_a,
+            &ellipsoid,
+            &cone,
+            // &sphere_b,
             &plane,
         ],
         camera: Camera::from_z_position(options.camera_z_position, options.projection_type),
