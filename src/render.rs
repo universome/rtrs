@@ -41,9 +41,9 @@ pub fn render(width: u32, height: u32, options: &RenderOptions) -> DynamicImage 
             //     scale: DiagMat3 {a: 0.75, b: 0.5, c: 0.5}
             // },
             &Cone {
-                apex: Point {x: 0.0, y: 0.5, z: 0.0},
-                half_angle: 0.3,
-                height: 1.0,
+                apex: Point {x: -0.5, y: 1.0, z: 0.5},
+                half_angle: 0.5,
+                height: 0.5,
                 color: Color {r: 1.0, g: 0.0, b: 0.0},
                 specular_strength: 0.5,
             },

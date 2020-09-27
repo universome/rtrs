@@ -13,10 +13,10 @@ mod surface;
 use render::{RenderOptions};
 use scene::{ProjectionType};
 
-// static WIDTH: u32 = 640;
-// static HEIGHT: u32 = 480;
-static WIDTH: u32 = 1280;
-static HEIGHT: u32 = 960;
+static WIDTH: u32 = 640;
+static HEIGHT: u32 = 480;
+// static WIDTH: u32 = 1280;
+// static HEIGHT: u32 = 960;
 static mut NUM_FRAMES_SINCE_LAST_SEC: u32 = 0;
 static mut LAST_SEC: u32 = 0;
 
@@ -90,7 +90,7 @@ fn view(app: &App, model: &Model, frame: Frame) {
     // which would allow us to get rid of mutable statics
     unsafe {
         if app.time.floor() as u32 != LAST_SEC {
-            println!("FPS: {}", NUM_FRAMES_SINCE_LAST_SEC);
+            println!("FPS: {}", NUM_FRAMES_SINCE_LAST_SEC + 1);
 
             LAST_SEC = app.time.floor() as u32;
             NUM_FRAMES_SINCE_LAST_SEC = 0;

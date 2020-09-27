@@ -130,43 +130,38 @@ pub struct Cone {
 
 impl Cone {
     fn compute_cone_hit(&self, ray: &Ray) -> Option<f32> {
-        let top_to_bot_vector = Vec3 {x: 0.0, y: -1.0, z: 0.0 };
-        let cos2_alpha = self.half_angle.cos().powi(2);
-        let apex_to_orig = (&ray.origin - &self.apex).normalize();
+        let center = Point {x: self.apex.x, y: self.apex.y - self.height, z: self.apex.z};
+        let a = ray.origin.x - center.x;
+        let b = ray.origin.z - center.z;
+        let c = self.height - ray.origin.y + center.y;
+        let tan2 = self.half_angle.tanh().powi(2);
+
         let roots = find_square_roots(
-            ray.direction.normalize().dot_product(&top_to_bot_vector).powi(2) - cos2_alpha,
-            2.0 * ((ray.direction.normalize().dot_product(&top_to_bot_vector) * apex_to_orig.dot_product(&top_to_bot_vector)) - ray.direction.normalize().dot_product(&apex_to_orig) * cos2_alpha),
-            apex_to_orig.dot_product(&top_to_bot_vector).powi(2) - apex_to_orig.norm_squared() * cos2_alpha,
+            ray.direction.x.powi(2) + ray.direction.z.powi(2) - ray.direction.y.powi(2) * tan2,
+            2.0 * (a * ray.direction.x + b * ray.direction.z + tan2 * c * ray.direction.y),
+            a * a + b * b - tan2 * c * c,
         )?;
 
-        if let Some(t) = select_smallest_positive_root(roots) {
-            let hit_point = ray.compute_point(t);
-            let bottom_center = Point {x: self.apex.x, y: self.apex.y - self.height, z: self.apex.z};
+        let t = select_smallest_positive_root(roots)?;
+        let py = ray.origin.y + t * ray.direction.y;
 
-            if (&hit_point - &self.apex).dot_product(&top_to_bot_vector) >= 0.0 {
-                if hit_point.y >= bottom_center.y {
-                    Some(t)
-                } else {
-                    None
-                }
-            } else {
-                None
-            }
-        } else {
-            None
+        if py > center.y && py < (center.y + self.height) {
+            return Some(py);
         }
+
+        None
     }
 
     fn compute_slab_hit(&self, ray: &Ray) -> Option<f32> {
-        let bottom_center = Point {x: self.apex.x, y: self.apex.y - self.height, z: self.apex.z};
+        let center = Point {x: self.apex.x, y: self.apex.y - self.height, z: self.apex.z};
         let slab_normal = Vec3 {x: 0.0, y: -1.0, z: 0.0};
         let radius = self.height * self.half_angle.tanh();
         let plane_hit = compute_plane_hit(
-            &bottom_center, &slab_normal, ray)?;
+            &center, &slab_normal, ray)?;
 
         let hit_point = ray.compute_point(plane_hit);
 
-        if (&hit_point - &bottom_center).norm_squared() < radius.powi(2) {
+        if (&hit_point - &center).norm_squared() < radius.powi(2) {
             Some(plane_hit)
         } else {
             None
@@ -174,13 +169,7 @@ impl Cone {
     }
 
     fn lies_on_slab(&self, point: &Point) -> bool {
-        let bottom_center = Point {x: self.apex.x, y: self.apex.y - self.height, z: self.apex.z};
-        let radius = self.height * self.half_angle.tanh();
-        let slab_normal = Vec3 {x: 0.0, y: -1.0, z: 0.0};
-        let lies_on_slab_plane = slab_normal.dot_product(&(point - &bottom_center)) == 0.0;
-        let is_close = (point - &bottom_center).norm_squared() < radius.powi(2);
-
-        lies_on_slab_plane && is_close
+        (point.y - (self.apex.y - self.height)).abs() < 0.000001
     }
 }
 
@@ -205,12 +194,21 @@ impl Surface for Cone {
         if self.lies_on_slab(point) {
             Vec3 {x: 0.0, y: -1.0, z: 0.0}
         } else {
-            let cos2_alpha = self.half_angle.cos().powi(2);
+            // let radius = self.height * self.half_angle.tanh();
+            // let current_r = ((point.x - self.apex.x).powi(2) + (point.z - self.apex.z).powi(2)).sqrt();
+
+            // (Vec3 {
+            //     x: ((point.x - self.apex.x) / current_r) * self.height / radius,
+            //     y: radius / self.height,
+            //     z: ((point.z - self.apex.z) / current_r) * self.height / radius,
+            // }).normalize()
+
+            let current_r = ((point.x - self.apex.x).powi(2) + (point.z - self.apex.z).powi(2)).sqrt();
 
             (Vec3 {
-                x: 2.0 * point.x,
-                y: -2.0 * point.y * cos2_alpha,
-                z: 2.0 * point.z,
+                x: point.x - self.apex.x,
+                y: self.half_angle.tanh() * current_r,
+                z: point.z - self.apex.z,
             }).normalize()
         }
     }
