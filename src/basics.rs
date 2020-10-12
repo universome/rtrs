@@ -1,6 +1,6 @@
 use std::ops;
 use nannou::image::{Rgb};
-use derive_more::{Add, Sub};
+use derive_more;
 
 
 #[derive(Debug, Clone)]
@@ -56,7 +56,7 @@ impl From<Color> for Rgb<u8> {
 }
 
 
-#[derive(Debug, Clone, Add, Sub, PartialEq)]
+#[derive(Debug, Clone, derive_more::Add, derive_more::Sub, PartialEq)]
 pub struct Vec3 {
     pub x: f32,
     pub y: f32,
@@ -87,6 +87,20 @@ impl Vec3 {
             x: self.y * other.z - self.z * other.y,
             y: self.z * other.x - self.x * other.z,
             z: self.x * other.y - self.y * other.x,
+        }
+    }
+}
+
+
+impl ops::Index<usize> for Vec3 {
+    type Output = f32;
+
+    fn index(&self, idx: usize) -> &f32 {
+        match idx {
+            0 => &self.x,
+            1 => &self.y,
+            2 => &self.z,
+            _ => panic!("Value {} is out of bounds for Vec3", idx),
         }
     }
 }

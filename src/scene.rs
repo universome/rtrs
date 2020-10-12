@@ -2,6 +2,7 @@ use std::ptr;
 
 use crate::surface::*;
 use crate::basics::*;
+use crate::matrix::*;
 
 
 pub struct Scene<'a> {
@@ -53,7 +54,7 @@ impl Scene<'_> {
                 let diffuse_cos = normal.dot_product(&light_dir.normalize());
                 let diffuse_light_color = &light.color * (diffuse_cos * self.diffuse_strength);
 
-                // Specular light componen
+                // Specular light component
                 let eye_dir = (&self.camera.origin - &point).normalize();
                 let half_vector = (eye_dir + light_dir).normalize();
                 let spec_strength = obj.get_specular_strength() * normal.dot_product(&half_vector).max(0.0).powf(64.0);
@@ -143,6 +144,7 @@ mod tests {
             center: Point {x: 0.0, y: 0.0, z: 0.0},
             radius: 1.0,
             color: Color {r: 1.0, g: 0.0, b: 0.0},
+            specular_strength: 0.0
         };
         let point_a = Point {x: 0.0, y: 1.0, z: 0.0};
         let point_b = Point {x: 0.0, y: 0.0, z: -1.0};

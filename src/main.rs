@@ -12,16 +12,17 @@ mod render;
 mod scene;
 mod basics;
 mod surface;
+mod matrix;
 
 use render::{RenderOptions};
 use scene::{ProjectionType};
 
-// static WIDTH: u32 = 640;
-// static HEIGHT: u32 = 480;
+static WIDTH: u32 = 640;
+static HEIGHT: u32 = 480;
 // static WIDTH: u32 = 800;
 // static HEIGHT: u32 = 600;
-static WIDTH: u32 = 1280;
-static HEIGHT: u32 = 960;
+// static WIDTH: u32 = 1280;
+// static HEIGHT: u32 = 960;
 static mut NUM_FRAMES_SINCE_LAST_SEC: u32 = 0;
 static mut LAST_SEC: u32 = 0;
 

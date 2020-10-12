@@ -151,9 +151,7 @@ impl Cone {
         let center = Point {x: self.apex.x, y: self.apex.y - self.height, z: self.apex.z};
         let slab_normal = Vec3 {x: 0.0, y: -1.0, z: 0.0};
         let radius = self.height * self.half_angle.tanh();
-        let plane_hit = compute_plane_hit(
-            &center, &slab_normal, ray)?;
-
+        let plane_hit = compute_plane_hit(&center, &slab_normal, ray)?;
         let hit_point = ray.compute_point(plane_hit);
 
         if (&hit_point - &center).norm_squared() < radius.powi(2) {
