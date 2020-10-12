@@ -205,15 +205,19 @@ impl Surface for Cone {
 pub struct TransformedSurface<'a> {
     transform: Mat3,
     transform_inv: Mat3,
+    transform_inv_t: Mat3,
     surface: &'a dyn Surface,
 }
 
 
 impl<'b> TransformedSurface<'b> {
     pub fn create<'a>(transform: Mat3, surface: &'a dyn Surface) -> TransformedSurface {
+        let transform_inv = transform.compute_inverse();
+
         TransformedSurface {
-            transform: transform.clone(),
-            transform_inv: transform.compute_inverse(),
+            transform: transform,
+            transform_inv: transform_inv.clone(),
+            transform_inv_t: transform_inv.transpose(),
             surface: surface,
         }
     }
@@ -237,7 +241,10 @@ impl<'a> Surface for TransformedSurface<'a> {
     }
 
     fn compute_normal(&self, point: &Point) -> Vec3 {
-        Vec3 {x: 0.0, y: 0.0, z: 0.0}
+        let point_transformed = &self.transform_inv * point;
+        let normal = self.surface.compute_normal(&point_transformed);
+
+        &self.transform_inv_t * &normal
     }
 
     fn get_color(&self) -> Color { self.surface.get_color() }

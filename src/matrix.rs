@@ -34,6 +34,14 @@ impl Mat3 {
             },
         ]}
     }
+
+    pub fn transpose(&self) -> Mat3 {
+        Mat3 {rows: [
+            Vec3 {x: self[0][0], y: self[1][0], z: self[2][0]},
+            Vec3 {x: self[0][1], y: self[1][1], z: self[2][1]},
+            Vec3 {x: self[0][2], y: self[1][2], z: self[2][2]},
+        ]}
+    }
 }
 
 

@@ -77,7 +77,7 @@ pub fn render(width: u32, height: u32, options: &RenderOptions) -> DynamicImage 
         ],
         camera: Camera::from_z_position(options.camera_z_position, options.projection_type),
         viewing_plane: ViewingPlane {
-            z: 0.0,
+            z: options.camera_z_position + 1.0,
             x_min: -2.0,
             x_max: 2.0,
             y_min: -1.5,
