@@ -45,7 +45,7 @@ fn model(app: &App) -> Model {
         opts: RenderOptions {
             projection_type: ProjectionType::Perspective,
             number_of_lights: 1,
-            camera_z_position: -10.0,
+            camera_z_position: -1000.0,
             specular_strength: 0.0,
         }
     }

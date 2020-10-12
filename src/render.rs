@@ -1,11 +1,10 @@
 use rayon::prelude::*;
-use nannou::image::{DynamicImage, ImageBuffer, RgbImage, Rgb};
-// use image::{RgbImage, Rgb};
-
+use nannou::image::{DynamicImage, RgbImage};
 
 use crate::scene::*;
 use crate::surface::*;
 use crate::basics::*;
+use crate::matrix::{Mat3};
 
 #[derive(Debug, Copy, Clone)]
 pub struct RenderOptions {
@@ -29,18 +28,31 @@ pub fn render(width: u32, height: u32, options: &RenderOptions) -> DynamicImage 
         });
     }
 
+    // let sphere = Sphere {
+    //     center: Point {x: 1.0, y: -1.5, z: -0.5},
+    //     radius: 0.5,
+    //     color: Color {r: 0.0, g: 0.0, b: 1.0},
+    //     specular_strength: options.specular_strength,
+    // };
+    // let ellipsoid = Ellipsoid {
+    //     center: Point {x: 0.0, y: 0.0, z: 0.0},
+    //     color: Color {r: 1.0, g: 0.0, b: 0.0},
+    //     specular_strength: options.specular_strength,
+    //     scale: DiagMat3 {a: 0.35, b: 0.25, c: 0.25}
+    // };
     let sphere = Sphere {
-        center: Point {x: 1.0, y: -1.5, z: -0.5},
+        center: Point {x: 0.0, y: 0.0, z: 0.0},
         radius: 0.5,
         color: Color {r: 0.0, g: 0.0, b: 1.0},
         specular_strength: options.specular_strength,
     };
-    let ellipsoid = Ellipsoid {
-        center: Point {x: 0.0, y: 0.0, z: 0.0},
-        color: Color {r: 1.0, g: 0.0, b: 0.0},
-        specular_strength: options.specular_strength,
-        scale: DiagMat3 {a: 0.35, b: 0.25, c: 0.25}
-    };
+    let sphere_transform = Mat3 {rows: [
+        Vec3 {x: 0.6, y: 0.0, z: 0.0},
+        Vec3 {x: 0.0, y: 0.6, z: 0.0},
+        Vec3 {x: 0.0, y: 0.0, z: 0.6},
+    ]};
+    let transformed_sphere = TransformedSurface::create(sphere_transform, &sphere);
+
     let cone = Cone {
         apex: Point {x: -2.0, y: 1.5, z: 2.5},
         half_angle: 0.5,
@@ -48,12 +60,18 @@ pub fn render(width: u32, height: u32, options: &RenderOptions) -> DynamicImage 
         color: Color {r: 0.0, g: 1.0, b: 0.0},
         specular_strength: options.specular_strength,
     };
+    let cone_transform = Mat3 {rows: [
+        Vec3 {x: 1.0, y: 0.0, z: 0.0},
+        Vec3 {x: 0.0, y: 1.0, z: 0.0},
+        Vec3 {x: 0.0, y: 0.0, z: 1.0},
+    ]};
+    let transformed_cone = TransformedSurface::create(cone_transform, &cone);
 
     let scene = Scene {
         objects: vec![
-            &sphere,
-            &ellipsoid,
-            &cone,
+            &transformed_sphere,
+            // &ellipsoid,
+            &transformed_cone,
             // &sphere_b,
             &plane,
         ],

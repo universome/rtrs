@@ -187,6 +187,11 @@ impl Ray {
         // Computes point on the ray given t value
         (&self.origin + &(&self.direction * t)).into()
     }
+
+    pub fn compute_t(&self, point: &Point) -> f32 {
+        // Assumes that the point lies on the ray
+        ((point - &self.origin).norm_squared() / self.direction.norm_squared()).sqrt()
+    }
 }
 
 #[derive(Debug, Clone)]

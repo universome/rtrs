@@ -1,6 +1,7 @@
 use std::marker::Sync;
 use std::fmt::Debug;
 use crate::basics::*;
+use crate::matrix::{Mat3};
 
 
 static MIN_RAY_T: f32 = 0.0001;
@@ -198,6 +199,49 @@ impl Surface for Cone {
 
     fn get_color(&self) -> Color { self.color.clone() }
     fn get_specular_strength(&self) -> f32 { self.specular_strength }
+}
+
+#[derive(Debug, Clone)]
+pub struct TransformedSurface<'a> {
+    transform: Mat3,
+    transform_inv: Mat3,
+    surface: &'a dyn Surface,
+}
+
+
+impl<'b> TransformedSurface<'b> {
+    pub fn create<'a>(transform: Mat3, surface: &'a dyn Surface) -> TransformedSurface {
+        TransformedSurface {
+            transform: transform.clone(),
+            transform_inv: transform.compute_inverse(),
+            surface: surface,
+        }
+    }
+}
+
+
+impl<'a> Surface for TransformedSurface<'a> {
+    fn compute_hit(&self, ray: &Ray) -> Option<f32> {
+        let ray_transformed = Ray {
+            origin: &self.transform_inv * &ray.origin,
+            direction: &self.transform_inv * &ray.direction,
+        };
+
+        if let Some(t) = self.surface.compute_hit(&ray_transformed) {
+            let hit_point = &self.transform * &ray_transformed.compute_point(t);
+
+            return Some(ray.compute_t(&hit_point));
+        }
+
+        None
+    }
+
+    fn compute_normal(&self, point: &Point) -> Vec3 {
+        Vec3 {x: 0.0, y: 0.0, z: 0.0}
+    }
+
+    fn get_color(&self) -> Color { self.surface.get_color() }
+    fn get_specular_strength(&self) -> f32 { self.surface.get_specular_strength() }
 }
 
 

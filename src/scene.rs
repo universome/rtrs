@@ -20,22 +20,6 @@ impl Scene<'_> {
         let (u, v) = self.viewing_plane.generate_uv_coords(i, j);
         let ray = self.camera.generate_ray(u, v, &self.viewing_plane);
 
-        // let mat = Mat3 {rows: [
-        //     Vec3 {x: 0.5, y: 0.0, z: 0.0},
-        //     Vec3 {x: 0.0, y: 0.5, z: 0.0},
-        //     Vec3 {x: 0.0, y: 0.0, z: 0.5},
-        // ]};
-        // let mat = Mat3 {rows: [
-        //     Vec3 {x: 1.0, y: 0.0, z: 0.0},
-        //     Vec3 {x: 0.0, y: 1.0, z: 0.0},
-        //     Vec3 {x: 0.0, y: 0.0, z: 1.0},
-        // ]};
-        // let mat_inv = mat.compute_inverse();
-        // let ray = Ray {
-        //     origin: &mat * &ray.origin,
-        //     direction: &mat * &ray.direction,
-        // };
-
         let mut closest_obj = None;
         let mut min_t = f32::INFINITY;
 
@@ -53,7 +37,6 @@ impl Scene<'_> {
             let mut color = &obj.get_color() * self.ambient_strength;
             let point = ray.compute_point(min_t);
             let normal = obj.compute_normal(&point);
-            // let normal = &mat_inv * &normal;
 
             for light in self.lights.iter() {
                 let distance_to_light = (&light.location - &point).norm();
@@ -69,7 +52,7 @@ impl Scene<'_> {
                         continue;
                 }
 
-                let diffuse_cos = normal.dot_product(&light_dir.normalize());
+                let diffuse_cos = normal.dot_product(&light_dir.normalize()).max(0.0);
                 let diffuse_light_color = &light.color * (diffuse_cos * self.diffuse_strength);
 
                 // Specular light component
