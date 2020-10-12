@@ -1,0 +1,16 @@
+Assignment 1: Simple Ray Tracing - minimal requirements
+
+(Minimal requirements are a guideline for succeeding to obtain 80% points. You are strongly encouraged to engage yourself with the assignment and implement features that are beyond this feature set by at least 20% to score the maximum points. However extra features do not mean that you do not need to implement one or the other minimum requirement aspect, those should be a subset of your assignment solution. On the student presentation, you should highlight the extra 20% of your assignment solution as this will likely differentiate you with the rest of the class.)
+
+Implement simple ray tracing algorithm that computes rays for a parallel and perspective projection for a given fixed viewpoint and viewing plane of a resolution at least 640x480. Viewing plane should be defined by equation z = 0 and its extents are [-2,2] in the x direction and [-1.5,1.5] in the y direction with the viewing direction in the positive z direction. The viewpoint should be at the position (0,0,-1).
+
+Define three distinct geometric object types of quadric surfaces, through their analytical formula (spheres, planes, ellipsoids, cones). Two of them should at least partially be defined within the range x:[-2,2], y:[-1.5,1.5], z:R+. First object of these two should be of color (1,0,0) and the second of color (0,1,0). One additional object should be in the same range but with z:R- colored with (0,0,1). A gray (0.5,0.5,0.5) plane should be the last object in the scene and it will be located in y = -1.4.
+
+Perform a simple intersection test for all pixels iterating over all objects. For each pixel define the closest point of intersection and calculate the surface normal at this location.
+
+Then perform the shading with the light positioned at the location (0,5,0) with light color (1,1,1). Calculate a simple Lambertian Shading Model at each intersection with ka = 0.3, kd=0.7. Keep in mind that each shadow ray (ray from surface point to the light source point) you need to calculate whether it intersects another object or not. If it does, the object is in shadow and only the ambient component will be used in the illumination calculation.
+
+For each calculated pixel value crop the floating point values to the range of [0..255] for each R,G,B channel and save the image in the TARGA file format. (More appreciated of course would be to create an image and show it in the application window.)
+
+Calculate the time it took to perform the raytracing calculation and specify the employed hardware.
+(Tip: If you use C++17 try to make use of CPU parallelism to gain points beyond the minimal requirements. See instructions: https://www.bfilipek.com/2017/08/cpp17-details-parallel.html?m=1)

@@ -1,9 +1,9 @@
 use std::ops;
-use crate::basics::{Vec3};
+use crate::basics::{Vec3, Point};
 
 #[derive(Debug, Clone)]
-struct Mat3 {
-    rows: [Vec3; 3],
+pub struct Mat3 {
+    pub rows: [Vec3; 3],
 }
 
 impl Mat3 {
@@ -13,7 +13,7 @@ impl Mat3 {
         self[0][2] * (self[1][0] * self[2][1] - self[1][1] * self[2][0])
     }
 
-    fn compute_inverse(&self) -> Mat3 {
+    pub fn compute_inverse(&self) -> Mat3 {
         let invdet = 1.0 / self.det();
 
         Mat3 {rows: [
@@ -46,23 +46,51 @@ impl ops::Index<usize> for Mat3 {
 }
 
 
-// #[derive(Debug, Clone)]
-// struct TransformationMatrix {
-//     transform: Mat3,
-//     translation: Vec3,
-// }
+impl ops::Mul<&Vec3> for &Mat3 {
+    type Output = Vec3;
 
-// impl TransformationMatrix {
-//     fn compute_inverse(&self) -> TransformationMatrix {
-//         let transform = self.transform.compute_inverse();
-//         let translation = self.transform.compute_inverse();
+    fn mul(self, vec: &Vec3) -> Vec3 {
+        Vec3 {
+            x: self[0].dot_product(vec),
+            y: self[1].dot_product(vec),
+            z: self[2].dot_product(vec),
+        }
+    }
+}
 
-//         TransformationMatrix {
-//             transform: transform,
-//             translation: translation,
-//         }
-//     }
-// }
+
+impl ops::Mul<&Point> for &Mat3 {
+    type Output = Point;
+
+    fn mul(self, point: &Point) -> Point {
+        let vec: Vec3 = point.into();
+
+        Point {
+            x: self[0].dot_product(&vec),
+            y: self[1].dot_product(&vec),
+            z: self[2].dot_product(&vec),
+        }
+    }
+}
+
+
+#[derive(Debug, Clone)]
+struct Transformation {
+    transform: Mat3,
+    translation: Vec3,
+}
+
+impl Transformation {
+    fn compute_inverse(&self) -> Transformation {
+        let transform_inv = self.transform.compute_inverse();
+        let back_translation = &(&transform_inv * &self.translation) * -1.0;
+
+        Transformation {
+            transform: transform_inv,
+            translation: back_translation,
+        }
+    }
+}
 
 
 // struct RotationMatrix {

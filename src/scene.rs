@@ -2,7 +2,7 @@ use std::ptr;
 
 use crate::surface::*;
 use crate::basics::*;
-use crate::matrix::*;
+use crate::matrix::{Mat3};
 
 
 pub struct Scene<'a> {
@@ -19,6 +19,23 @@ impl Scene<'_> {
     pub fn compute_pixel(&self, i: u32, j: u32) -> Color {
         let (u, v) = self.viewing_plane.generate_uv_coords(i, j);
         let ray = self.camera.generate_ray(u, v, &self.viewing_plane);
+
+        // let mat = Mat3 {rows: [
+        //     Vec3 {x: 0.5, y: 0.0, z: 0.0},
+        //     Vec3 {x: 0.0, y: 0.5, z: 0.0},
+        //     Vec3 {x: 0.0, y: 0.0, z: 0.5},
+        // ]};
+        // let mat = Mat3 {rows: [
+        //     Vec3 {x: 1.0, y: 0.0, z: 0.0},
+        //     Vec3 {x: 0.0, y: 1.0, z: 0.0},
+        //     Vec3 {x: 0.0, y: 0.0, z: 1.0},
+        // ]};
+        // let mat_inv = mat.compute_inverse();
+        // let ray = Ray {
+        //     origin: &mat * &ray.origin,
+        //     direction: &mat * &ray.direction,
+        // };
+
         let mut closest_obj = None;
         let mut min_t = f32::INFINITY;
 
@@ -36,6 +53,7 @@ impl Scene<'_> {
             let mut color = &obj.get_color() * self.ambient_strength;
             let point = ray.compute_point(min_t);
             let normal = obj.compute_normal(&point);
+            // let normal = &mat_inv * &normal;
 
             for light in self.lights.iter() {
                 let distance_to_light = (&light.location - &point).norm();

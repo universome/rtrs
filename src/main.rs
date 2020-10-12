@@ -45,7 +45,7 @@ fn model(app: &App) -> Model {
         opts: RenderOptions {
             projection_type: ProjectionType::Perspective,
             number_of_lights: 1,
-            camera_z_position: -1.0,
+            camera_z_position: -10.0,
             specular_strength: 0.0,
         }
     }
@@ -93,7 +93,7 @@ fn view(app: &App, model: &Model, frame: Frame) {
 
     unsafe {
         if NUM_FRAMES_SINCE_LAST_SEC == 0 && LAST_SEC % 10 == 0 {
-           img.save("image.tga").unwrap();
+            img.save("image.tga").unwrap();
         }
     }
 
@@ -114,7 +114,7 @@ fn view(app: &App, model: &Model, frame: Frame) {
         }
     }
 
-    println!("Time: {}", app.time);
+    // println!("Time: {}", app.time);
 
     draw.to_frame(app, &frame).unwrap();
 }

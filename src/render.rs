@@ -1,5 +1,7 @@
 use rayon::prelude::*;
-use nannou::image::{DynamicImage, ImageBuffer, Rgb};
+use nannou::image::{DynamicImage, ImageBuffer, RgbImage, Rgb};
+// use image::{RgbImage, Rgb};
+
 
 use crate::scene::*;
 use crate::surface::*;
@@ -12,7 +14,6 @@ pub struct RenderOptions {
     pub camera_z_position: f32,
     pub specular_strength: f32,
 }
-
 
 pub fn render(width: u32, height: u32, options: &RenderOptions) -> DynamicImage {
     let plane = Plane::from_y(-1.4, Color {r: 0.5, g: 0.5, b: 0.5});
@@ -72,19 +73,20 @@ pub fn render(width: u32, height: u32, options: &RenderOptions) -> DynamicImage 
         diffuse_strength: 0.7,
     };
 
-    let image_vec = iproduct!(0..height, 0..width)
+    let pixels = iproduct!(0..height, 0..width)
         .collect::<Vec<(u32, u32)>>()
         .par_iter()
-        .map(|p: &(u32, u32)| -> Vec<u8> {
-            let color = scene.compute_pixel(p.1, height - p.0);
-            vec![(color.r * 255.0) as u8, (color.g * 255.0) as u8, (color.b * 255.0) as u8]
+        .map(|p: &(u32, u32)| -> Color {
+            scene.compute_pixel(p.1, height - p.0)
         })
-        .collect::<Vec<Vec<u8>>>()
-        .into_iter()
-        .flatten()
-        .collect::<Vec<u8>>();
+        .collect::<Vec<Color>>();
 
-    let image_buf = ImageBuffer::<Rgb<u8>, Vec<u8>>::from_vec(width, height, image_vec).unwrap();
+    let mut img = RgbImage::new(width, height);
+    for y in 0..height {
+        for x in 0..width {
+            img.put_pixel(x, y, pixels[(width * y + x) as usize].clone().into());
+        }
+    }
 
-    DynamicImage::ImageRgb8(image_buf)
+    DynamicImage::ImageRgb8(img)
 }
