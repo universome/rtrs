@@ -3,23 +3,48 @@ use std::ptr;
 use crate::surface::*;
 use crate::basics::*;
 use crate::matrix::{Mat3};
+use crate::render::{CameraOptions};
 
 
 pub struct Scene<'a> {
     pub objects: Vec<&'a dyn Surface>,
     pub camera: Camera,
-    pub viewing_plane: ViewingPlane,
     pub background_color: Color,
     pub lights: Vec<Light>,
     pub ambient_strength: f32,
     pub diffuse_strength: f32,
 }
 
+
+#[derive(Debug, Clone, Copy)]
+pub enum ProjectionType {Parallel, Perspective}
+
+#[derive(Debug, Clone)]
+pub struct Camera {
+    origin: Point,
+    direction: Vec3,
+    up: Vec3,
+    right: Vec3,
+    projection_type: ProjectionType,
+    viewing_plane: ViewingPlane,
+}
+
+
+#[derive(Debug, Clone)]
+pub struct ViewingPlane {
+    pub z: f32,
+    pub x_min: f32,
+    pub x_max: f32,
+    pub y_min: f32,
+    pub y_max: f32,
+    pub width: u32,
+    pub height: u32,
+}
+
+
 impl Scene<'_> {
     pub fn compute_pixel(&self, i: u32, j: u32) -> Color {
-        let (u, v) = self.viewing_plane.generate_uv_coords(i, j);
-        let ray = self.camera.generate_ray(u, v, &self.viewing_plane);
-
+        let ray = self.camera.generate_ray(i, j);
         let mut closest_obj = None;
         let mut min_t = f32::INFINITY;
 
@@ -72,31 +97,29 @@ impl Scene<'_> {
 }
 
 
-#[derive(Debug, Clone, Copy)]
-pub enum ProjectionType {Parallel, Perspective}
-
-#[derive(Debug, Clone)]
-pub struct Camera {
-    origin: Point,
-    direction: Vec3,
-    up: Vec3,
-    right: Vec3,
-    projection_type: ProjectionType
-}
-
 impl Camera {
-    pub fn from_z_position(z: f32, projection_type: ProjectionType) -> Camera {
+    pub fn from_z_position(z: f32, projection_type: ProjectionType, width: u32, height: u32) -> Camera {
         Camera {
             origin: Point {x: 0.0, y: 0.0, z: z},
-            direction: Vec3 {x: 0.0, y: 0.0, z: -1.0},
+            direction: Vec3 {x: 0.0, y: 0.0, z: 1.0},
             up: Vec3 {x: 0.0, y: 1.0, z: 0.0},
             right: Vec3 {x: 1.0, y: 0.0, z: 0.0},
-            projection_type: projection_type
+            projection_type: projection_type,
+            viewing_plane: ViewingPlane {
+                z: z + 0.1,
+                x_min: -0.1,
+                x_max: 0.1,
+                y_min: -0.075,
+                y_max: 0.075,
+                width: width,
+                height: height,
+            }
         }
     }
 
-    pub fn generate_ray(&self, u: f32, v: f32, viewing_plane: &ViewingPlane) -> Ray {
-        let d = viewing_plane.z - self.origin.z;
+    pub fn generate_ray(&self, i: u32, j: u32) -> Ray {
+        let (u, v) = self.viewing_plane.generate_uv_coords(i, j);
+        let d = self.viewing_plane.z - self.origin.z;
 
         match self.projection_type {
             ProjectionType::Perspective => Ray {
@@ -112,16 +135,6 @@ impl Camera {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct ViewingPlane {
-    pub z: f32,
-    pub x_min: f32,
-    pub x_max: f32,
-    pub y_min: f32,
-    pub y_max: f32,
-    pub width: u32,
-    pub height: u32,
-}
 
 impl ViewingPlane {
     pub fn generate_uv_coords(&self, i: u32, j: u32) -> (f32, f32) {

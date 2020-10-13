@@ -14,8 +14,10 @@ mod basics;
 mod surface;
 mod matrix;
 
-use render::{RenderOptions};
+use basics::*;
+use render::{RenderOptions, CameraOptions};
 use scene::{ProjectionType};
+use matrix::{Transformation, Mat3};
 
 static WIDTH: u32 = 640;
 static HEIGHT: u32 = 480;
@@ -45,7 +47,11 @@ fn model(app: &App) -> Model {
         opts: RenderOptions {
             projection_type: ProjectionType::Perspective,
             number_of_lights: 1,
-            camera_z_position: -5.0,
+            camera_options: CameraOptions {
+                yaw: -0.5 * std::f32::consts::PI,
+                pitch: 0.0,
+                position: Vec3 {x: 0.0, y: 0.0, z: -1.0},
+            },
             specular_strength: 0.0,
         }
     }
@@ -65,12 +71,36 @@ fn update(_app: &App, model: &mut Model, event: WindowEvent) {
                         ProjectionType::Perspective => ProjectionType::Parallel,
                     };
                 },
-                Key::Z => {
-                    model.opts.camera_z_position = if model.opts.camera_z_position == -1.0 { -5.0 } else { -1.0 };
+                Key::W => {
+                    model.opts.camera_options.position.z += 0.2;
                 },
                 Key::S => {
-                    model.opts.specular_strength = if model.opts.specular_strength == 0.0 { 0.5 } else { 0.0 };
+                    model.opts.camera_options.position.z -= 0.2;
                 },
+                Key::D => {
+                    model.opts.camera_options.position.x += 0.2;
+                },
+                Key::A => {
+                    model.opts.camera_options.position.x -= 0.2;
+                },
+                Key::Up => {
+                    model.opts.camera_options.pitch -= 0.1;
+                },
+                Key::Down => {
+                    model.opts.camera_options.pitch += 0.1;
+                },
+                Key::Right => {
+                    model.opts.camera_options.yaw += 0.1;
+                },
+                Key::Left => {
+                    model.opts.camera_options.yaw -= 0.1;
+                },
+                // Key::Z => {
+                //     model.opts.camera_z_position = if model.opts.camera_z_position == -1.0 { -5.0 } else { -1.0 };
+                // },
+                // Key::S => {
+                //     model.opts.specular_strength = if model.opts.specular_strength == 0.0 { 0.5 } else { 0.0 };
+                // },
                 _ => {},
             }
         }

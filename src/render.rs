@@ -6,13 +6,21 @@ use crate::surface::*;
 use crate::basics::*;
 use crate::matrix::{Mat3, Transformation};
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Clone)]
 pub struct RenderOptions {
     pub projection_type: ProjectionType,
     pub number_of_lights: u32,
-    pub camera_z_position: f32,
+    pub camera_options: CameraOptions,
     pub specular_strength: f32,
 }
+
+#[derive(Debug, Clone)]
+pub struct CameraOptions {
+    pub pitch: f32,
+    pub yaw: f32,
+    pub position: Vec3,
+}
+
 
 pub fn render(width: u32, height: u32, options: &RenderOptions) -> DynamicImage {
     let plane = Plane::from_y(-1.4, Color {r: 0.5, g: 0.5, b: 0.5});
@@ -27,6 +35,12 @@ pub fn render(width: u32, height: u32, options: &RenderOptions) -> DynamicImage 
             color: Color {r: 1.0, g: 1.0, b: 1.0},
         });
     }
+
+    let lookat_transform = Transformation::create_look_at(
+        &options.camera_options.position,
+        options.camera_options.yaw,
+        options.camera_options.pitch,
+    );
 
     // let sphere = Sphere {
     //     center: Point {x: 1.0, y: -1.5, z: -0.5},
@@ -54,6 +68,7 @@ pub fn render(width: u32, height: u32, options: &RenderOptions) -> DynamicImage 
         ]},
         translation: Vec3 {x: 1.0, y: 0.0, z: 0.0},
     };
+    let sphere_transform = &lookat_transform * &sphere_transform;
     let transformed_sphere = TransformedSurface::new(sphere_transform, &sphere);
 
     let cone = Cone {
@@ -71,6 +86,7 @@ pub fn render(width: u32, height: u32, options: &RenderOptions) -> DynamicImage 
         ]},
         translation: Vec3 {x: 0.0, y: 0.0, z: 0.0},
     };
+    let cone_transform = &lookat_transform * &cone_transform;
     let transformed_cone = TransformedSurface::new(cone_transform, &cone);
 
     let scene = Scene {
@@ -81,18 +97,10 @@ pub fn render(width: u32, height: u32, options: &RenderOptions) -> DynamicImage 
             &transformed_cone,
             // &ellipsoid,
             // &sphere_b,
-            &plane,
+            // &plane,
         ],
-        camera: Camera::from_z_position(options.camera_z_position, options.projection_type),
-        viewing_plane: ViewingPlane {
-            z: options.camera_z_position + 1.0,
-            x_min: -2.0,
-            x_max: 2.0,
-            y_min: -1.5,
-            y_max: 1.5,
-            width: width,
-            height: height,
-        },
+        camera: Camera::from_z_position(-1.0, options.projection_type, width, height),
+        // camera: Camera::from_options(&options.camera_options, options.projection_type, width, height),
         background_color: Color {r: 0.204, g: 0.596, b: 0.86},
         lights: lights,
         ambient_strength: 0.3,

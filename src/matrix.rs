@@ -82,6 +82,21 @@ impl ops::Mul<&Point> for &Mat3 {
 }
 
 
+impl ops::Mul<&Mat3> for &Mat3 {
+    type Output = Mat3;
+
+    fn mul(self, other: &Mat3) -> Mat3 {
+        let other_t = other.transpose();
+
+        Mat3 {rows: [
+            self * &other_t.rows[0],
+            self * &other_t.rows[1],
+            self * &other_t.rows[2],
+        ]}
+    }
+}
+
+
 #[derive(Debug, Clone)]
 pub struct Transformation {
     pub transform_mat: Mat3,
@@ -97,6 +112,22 @@ impl Transformation {
         }
     }
 
+    pub fn create_look_at(position: &Vec3, yaw: f32, pitch: f32) -> Self {
+        let direction = (Vec3 {
+            x: yaw.cos() * pitch.cos(),
+            y: pitch.sin(),
+            z: yaw.sin() * pitch.cos(),
+        }).normalize();
+        let right = (&Vec3 {x: 0.0, y: 1.0, z: 0.0}).cross_product(&direction).normalize();
+        let up = direction.cross_product(&right).normalize();
+        let rotation_inv = Mat3 {rows: [right, up, direction]};
+
+        Transformation {
+            translation: &rotation_inv * &(position * -1.0),
+            transform_mat: rotation_inv,
+        }
+    }
+
     pub fn compute_inverse(&self) -> Self {
         let transform_inv = self.transform_mat.compute_inverse();
         let back_translation = &(&transform_inv * &self.translation) * -1.0;
@@ -106,15 +137,20 @@ impl Transformation {
             translation: back_translation,
         }
     }
-
-    // pub fn transpose(&self) -> Self {
-    //     Transformation {
-    //         transform_mat: self.transform_mat.transpose(),
-    //         translation: self.translation.clone(),
-    //         is_transposed: !self.is_transposed,
-    //     }
-    // }
 }
+
+
+impl ops::Mul<&Transformation> for &Transformation {
+    type Output = Transformation;
+
+    fn mul(self, other: &Transformation) -> Transformation {
+        Transformation {
+            transform_mat: &self.transform_mat * &other.transform_mat.transpose(),
+            translation: &(&self.transform_mat * &other.translation) + &self.translation,
+        }
+    }
+}
+
 
 
 impl ops::Mul<&Vec3> for &Transformation {
