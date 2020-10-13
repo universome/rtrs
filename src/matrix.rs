@@ -119,6 +119,7 @@ impl Transformation {
             z: yaw.sin() * pitch.cos(),
         }).normalize();
         let right = (&Vec3 {x: 0.0, y: 1.0, z: 0.0}).cross_product(&direction).normalize();
+        // let right = direction.cross_product(&Vec3 {x: 0.0, y: 1.0, z: 0.0}).normalize();
         let up = direction.cross_product(&right).normalize();
         let rotation_inv = Mat3 {rows: [right, up, direction]};
 

@@ -23,7 +23,6 @@ pub struct CameraOptions {
 
 
 pub fn render(width: u32, height: u32, options: &RenderOptions) -> DynamicImage {
-    let plane = Plane::from_y(-1.4, Color {r: 0.5, g: 0.5, b: 0.5});
     let mut lights = vec![Light {
         location: Point {x: 0.0, y: 5.0, z: 0.0},
         color: Color {r: 1.0, g: 1.0, b: 1.0},
@@ -62,17 +61,20 @@ pub fn render(width: u32, height: u32, options: &RenderOptions) -> DynamicImage 
     };
     let sphere_transform = Transformation {
         transform_mat: Mat3 {rows: [
-            Vec3 {x: 0.5, y: 0.0, z: 0.0},
-            Vec3 {x: 1.0, y: 0.5, z: 0.0},
-            Vec3 {x: 0.0, y: 0.0, z: 0.5},
+            Vec3 {x: 0.25, y: 0.0, z: 0.0},
+            Vec3 {x: 0.0, y: 0.25, z: 0.0},
+            Vec3 {x: 0.0, y: 0.0, z: 0.25},
         ]},
-        translation: Vec3 {x: 1.0, y: 0.0, z: 0.0},
+        translation: Vec3 {x: 0.0, y: 0.0, z: 0.0},
     };
     let sphere_transform = &lookat_transform * &sphere_transform;
     let transformed_sphere = TransformedSurface::new(sphere_transform, &sphere);
 
+    let plane = Plane::from_y(-1.4, Color {r: 0.5, g: 0.5, b: 0.5});
+    let transformed_plane = TransformedSurface::new(lookat_transform.clone(), &plane);
+
     let cone = Cone {
-        apex: Point {x: -2.0, y: 1.5, z: 2.5},
+        apex: Point {x: -1.0, y: 1.0, z: 0.0},
         half_angle: 0.5,
         height: 0.5,
         color: Color {r: 0.0, g: 1.0, b: 0.0},
@@ -91,16 +93,11 @@ pub fn render(width: u32, height: u32, options: &RenderOptions) -> DynamicImage 
 
     let scene = Scene {
         objects: vec![
-            // &sphere,
-            // &cone,
             &transformed_sphere,
             &transformed_cone,
-            // &ellipsoid,
-            // &sphere_b,
-            // &plane,
+            &transformed_plane,
         ],
         camera: Camera::from_z_position(-1.0, options.projection_type, width, height),
-        // camera: Camera::from_options(&options.camera_options, options.projection_type, width, height),
         background_color: Color {r: 0.204, g: 0.596, b: 0.86},
         lights: lights,
         ambient_strength: 0.3,

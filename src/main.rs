@@ -31,11 +31,15 @@ static mut LAST_SEC: u32 = 0;
 
 struct Model {
     opts: RenderOptions,
+    is_mouse_inited: bool,
+    curr_mouse_x: f32,
+    curr_mouse_y: f32,
+    mouse_sensitivity: f32,
 }
 
 
 fn main() {
-    // rayon::ThreadPoolBuilder::new().num_threads(1).build_global().unwrap();
+    rayon::ThreadPoolBuilder::new().num_threads(4).build_global().unwrap();
 
     nannou::app(model).run();
 }
@@ -53,14 +57,24 @@ fn model(app: &App) -> Model {
                 position: Vec3 {x: 0.0, y: 0.0, z: -1.0},
             },
             specular_strength: 0.0,
-        }
+        },
+        is_mouse_inited: false,
+        curr_mouse_x: 0.0,
+        curr_mouse_y: 0.0,
+        mouse_sensitivity: 0.01,
     }
 }
 
 
 fn update(_app: &App, model: &mut Model, event: WindowEvent) {
+    let camera_transformation = Transformation::create_look_at(
+        &model.opts.camera_options.position,
+        model.opts.camera_options.yaw,
+        model.opts.camera_options.pitch,
+    );
+
     match event {
-        KeyReleased(key) => {
+        KeyPressed(key) => {
             match key {
                 Key::L => {
                     model.opts.number_of_lights = model.opts.number_of_lights % 2 + 1;
@@ -71,39 +85,34 @@ fn update(_app: &App, model: &mut Model, event: WindowEvent) {
                         ProjectionType::Perspective => ProjectionType::Parallel,
                     };
                 },
-                Key::W => {
-                    model.opts.camera_options.position.z += 0.2;
-                },
-                Key::S => {
-                    model.opts.camera_options.position.z -= 0.2;
-                },
-                Key::D => {
-                    model.opts.camera_options.position.x += 0.2;
-                },
-                Key::A => {
-                    model.opts.camera_options.position.x -= 0.2;
-                },
-                Key::Up => {
-                    model.opts.camera_options.pitch -= 0.1;
-                },
-                Key::Down => {
-                    model.opts.camera_options.pitch += 0.1;
-                },
-                Key::Right => {
-                    model.opts.camera_options.yaw += 0.1;
-                },
-                Key::Left => {
-                    model.opts.camera_options.yaw -= 0.1;
-                },
-                // Key::Z => {
-                //     model.opts.camera_z_position = if model.opts.camera_z_position == -1.0 { -5.0 } else { -1.0 };
-                // },
-                // Key::S => {
-                //     model.opts.specular_strength = if model.opts.specular_strength == 0.0 { 0.5 } else { 0.0 };
-                // },
+                Key::W => model.opts.camera_options.position = &model.opts.camera_options.position + &(&camera_transformation.transform_mat[2] * -0.1),
+                Key::S => model.opts.camera_options.position = &model.opts.camera_options.position + &(&camera_transformation.transform_mat[2] * 0.1),
+                Key::D => model.opts.camera_options.position = &model.opts.camera_options.position + &(&camera_transformation.transform_mat[0] * 0.1),
+                Key::A => model.opts.camera_options.position = &model.opts.camera_options.position + &(&camera_transformation.transform_mat[0] * -0.1),
+                Key::Left => model.opts.camera_options.yaw += 0.1,
+                Key::Right => model.opts.camera_options.yaw -= 0.1,
                 _ => {},
             }
-        }
+        },
+        MouseMoved(point) => {
+            if (!model.is_mouse_inited) {
+                model.curr_mouse_x = point.x;
+                model.curr_mouse_y = point.y;
+                model.is_mouse_inited = true;
+            }
+
+            let offset_x = (point.x - model.curr_mouse_x) * model.mouse_sensitivity;
+            let offset_y = (model.curr_mouse_y - point.y) * model.mouse_sensitivity;
+
+            model.curr_mouse_x = point.x;
+            model.curr_mouse_y = point.y;
+            model.opts.camera_options.yaw += offset_x;
+            model.opts.camera_options.pitch += offset_y;
+
+            model.opts.camera_options.pitch = model.opts.camera_options.pitch
+                .min(0.5 * std::f32::consts::PI - 0.001)
+                .max(-0.5 * std::f32::consts::PI + 0.001);
+        },
         // MousePressed(_button) => {
         //     println!("global scope: GLOBAL = {}", GLOBAL);
         // }

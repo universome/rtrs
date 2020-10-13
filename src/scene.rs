@@ -106,7 +106,7 @@ impl Camera {
             right: Vec3 {x: 1.0, y: 0.0, z: 0.0},
             projection_type: projection_type,
             viewing_plane: ViewingPlane {
-                z: z + 0.1,
+                z: z + 0.5,
                 x_min: -0.1,
                 x_max: 0.1,
                 y_min: -0.075,
