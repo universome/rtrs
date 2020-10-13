@@ -1,7 +1,7 @@
 use std::marker::Sync;
 use std::fmt::Debug;
 use crate::basics::*;
-use crate::matrix::{Mat3};
+use crate::matrix::{Mat3, Transformation};
 
 
 static MIN_RAY_T: f32 = 0.0001;
@@ -203,21 +203,21 @@ impl Surface for Cone {
 
 #[derive(Debug, Clone)]
 pub struct TransformedSurface<'a> {
-    transform: Mat3,
-    transform_inv: Mat3,
+    transformation: Transformation,
+    transformation_inv: Transformation,
     transform_inv_t: Mat3,
     surface: &'a dyn Surface,
 }
 
 
 impl<'b> TransformedSurface<'b> {
-    pub fn create<'a>(transform: Mat3, surface: &'a dyn Surface) -> TransformedSurface {
-        let transform_inv = transform.compute_inverse();
+    pub fn new<'a>(transformation: Transformation, surface: &'a dyn Surface) -> TransformedSurface {
+        let transformation_inv = transformation.compute_inverse();
 
         TransformedSurface {
-            transform: transform,
-            transform_inv: transform_inv.clone(),
-            transform_inv_t: transform_inv.transpose(),
+            transformation: transformation,
+            transform_inv_t: transformation_inv.transform_mat.transpose(),
+            transformation_inv: transformation_inv,
             surface: surface,
         }
     }
@@ -227,12 +227,12 @@ impl<'b> TransformedSurface<'b> {
 impl<'a> Surface for TransformedSurface<'a> {
     fn compute_hit(&self, ray: &Ray) -> Option<f32> {
         let ray_transformed = Ray {
-            origin: &self.transform_inv * &ray.origin,
-            direction: &self.transform_inv * &ray.direction,
+            origin: &self.transformation_inv * &ray.origin,
+            direction: &self.transformation_inv * &ray.direction,
         };
 
         if let Some(t) = self.surface.compute_hit(&ray_transformed) {
-            let hit_point = &self.transform * &ray_transformed.compute_point(t);
+            let hit_point = &self.transformation * &ray_transformed.compute_point(t);
 
             return Some(ray.compute_t(&hit_point));
         }
@@ -241,10 +241,10 @@ impl<'a> Surface for TransformedSurface<'a> {
     }
 
     fn compute_normal(&self, point: &Point) -> Vec3 {
-        let point_transformed = &self.transform_inv * point;
+        let point_transformed = &self.transformation_inv * point;
         let normal = self.surface.compute_normal(&point_transformed);
 
-        &self.transform_inv_t * &normal
+        (&self.transform_inv_t * &normal).normalize()
     }
 
     fn get_color(&self) -> Color { self.surface.get_color() }

@@ -83,27 +83,59 @@ impl ops::Mul<&Point> for &Mat3 {
 
 
 #[derive(Debug, Clone)]
-struct Transformation {
-    transform: Mat3,
-    translation: Vec3,
+pub struct Transformation {
+    pub transform_mat: Mat3,
+    pub translation: Vec3,
 }
 
+
 impl Transformation {
-    fn compute_inverse(&self) -> Transformation {
-        let transform_inv = self.transform.compute_inverse();
+    pub fn new(&self, transform_mat: Mat3, translation: Vec3) -> Self {
+        Transformation {
+            transform_mat: transform_mat,
+            translation: translation,
+        }
+    }
+
+    pub fn compute_inverse(&self) -> Self {
+        let transform_inv = self.transform_mat.compute_inverse();
         let back_translation = &(&transform_inv * &self.translation) * -1.0;
 
         Transformation {
-            transform: transform_inv,
+            transform_mat: transform_inv,
             translation: back_translation,
         }
+    }
+
+    // pub fn transpose(&self) -> Self {
+    //     Transformation {
+    //         transform_mat: self.transform_mat.transpose(),
+    //         translation: self.translation.clone(),
+    //         is_transposed: !self.is_transposed,
+    //     }
+    // }
+}
+
+
+impl ops::Mul<&Vec3> for &Transformation {
+    type Output = Vec3;
+
+    fn mul(self, vec: &Vec3) -> Vec3 {
+        &self.transform_mat * vec
     }
 }
 
 
-// struct RotationMatrix {
+impl ops::Mul<&Point> for &Transformation {
+    type Output = Point;
 
-// }
+    fn mul(self, point: &Point) -> Point {
+        let vec: Vec3 = point.into();
+
+        (&(&self.transform_mat * &vec) + &self.translation).into()
+    }
+}
+
 
 #[cfg(test)]
 mod tests {
@@ -150,5 +182,23 @@ mod tests {
         assert!(approx_eq!(f32, rando_mat_inv[2][0], -0.178051, epsilon=0.0001));
         assert!(approx_eq!(f32, rando_mat_inv[2][1], 0.163276, epsilon=0.0001));
         assert!(approx_eq!(f32, rando_mat_inv[2][2], 0.0454597, epsilon=0.0001));
+    }
+
+    #[test]
+    fn test_transformation() {
+        let transformation = Transformation {
+            transform_mat: Mat3 {rows: [
+                Vec3 {x: 1.0, y: 0.0, z: 0.0},
+                Vec3 {x: 0.0, y: 1.0, z: 0.0},
+                Vec3 {x: 0.0, y: 0.0, z: 1.0},
+            ]},
+            translation: Vec3 {x: 0.0, y: 0.0, z: 0.0},
+        };
+        let point = Point { x: 1.0, y: 1.0, z: 1.0 };
+        let point_transformed = &transformation * &point;
+
+        assert_eq!(point_transformed.x, 1.0);
+        assert_eq!(point_transformed.y, 1.0);
+        assert_eq!(point_transformed.z, 1.0);
     }
 }
