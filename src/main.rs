@@ -25,10 +25,12 @@ use crate::surface::{TransformedSurface, Sphere, Plane, Cone};
 use crate::basics::*;
 use crate::matrix::{Mat3, Transformation};
 
-static WIDTH: u32 = 640;
-static HEIGHT: u32 = 480;
-// static WIDTH: u32 = 800;
-// static HEIGHT: u32 = 600;
+// static WIDTH: u32 = 640;
+// static HEIGHT: u32 = 480;
+static WIDTH: u32 = 800;
+static HEIGHT: u32 = 600;
+// static WIDTH: u32 = 960;
+// static HEIGHT: u32 = 720;
 // static WIDTH: u32 = 1280;
 // static HEIGHT: u32 = 960;
 static mut NUM_FRAMES_SINCE_LAST_SEC: u32 = 0;
@@ -316,7 +318,7 @@ fn build_model() -> Model {
         curr_mouse_x: 0.0,
         curr_mouse_y: 0.0,
         mouse_sensitivity: 0.001,
-        move_speed: 0.1,
+        move_speed: 0.05,
         mouse_is_in_window: false,
         scroll_speed: 0.01,
         rotation_speed: 0.1,
