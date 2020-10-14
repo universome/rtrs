@@ -15,6 +15,14 @@ impl Mat3 {
         ]}
     }
 
+    pub fn scale(scales: Vec3) -> Self {
+        Mat3 {rows: [
+            Vec3::new(scales[0], 0.0, 0.0),
+            Vec3::new(0.0, scales[1], 0.0),
+            Vec3::new(0.0, 0.0, scales[2]),
+        ]}
+    }
+
     pub fn rotation(angle: f32, axis: Vec3) -> Self {
         Mat3 {rows: [
             Vec3::new(
@@ -151,6 +159,18 @@ impl Transformation {
             transform_mat: transform_mat,
             translation: translation,
         }
+    }
+
+    pub fn translation(translation: Vec3) -> Self {
+        Transformation::new(Mat3::identity(), translation)
+    }
+
+    pub fn rotation(angle: f32, axis: Vec3) -> Self {
+        Transformation::new(Mat3::rotation(angle, axis), Vec3::zero())
+    }
+
+    pub fn scale(scales: Vec3) -> Self {
+        Transformation::new(Mat3::scale(scales), Vec3::zero())
     }
 
     pub fn identity() -> Self {

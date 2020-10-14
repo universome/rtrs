@@ -68,6 +68,10 @@ impl Vec3 {
         Vec3 {x: x, y: y, z: z}
     }
 
+    pub fn zero() -> Self {
+        Vec3::new(0.0, 0.0, 0.0)
+    }
+
     pub fn normalize(&self) -> Self {
         let norm = self.norm();
 

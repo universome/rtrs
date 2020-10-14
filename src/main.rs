@@ -46,6 +46,7 @@ pub struct Model {
     mouse_is_in_window: bool,
     scroll_speed: f32,
     rotation_speed: f32,
+    scale_speed: f32,
 }
 
 
@@ -129,26 +130,44 @@ fn process_keys(app: &App, model: &mut Model) {
     }
 
     if let Some(idx) = model.opts.selected_object_idx {
-        if app.keys.down.contains(&Key::Up) {
-            model.opts.transformations[idx].translation = &model.opts.transformations[idx].translation + &(&camera_transformation.transform_mat[1] * model.move_speed);
+        let mut transformation = None;
+
+        if app.keys.down.contains(&Key::Key1) {
+            if app.keys.down.contains(&Key::Up) {
+                transformation = Some(Transformation::scale(Vec3::new(1.0 + model.scale_speed, 1.0, 1.0)));
+            } else if app.keys.down.contains(&Key::Down) {
+                transformation = Some(Transformation::scale(Vec3::new(1.0 - model.scale_speed, 1.0, 1.0)));
+            }
+        } else if app.keys.down.contains(&Key::Key2) {
+            if app.keys.down.contains(&Key::Up) {
+                transformation = Some(Transformation::scale(Vec3::new(1.0, 1.0 + model.scale_speed, 1.0)));
+            } else if app.keys.down.contains(&Key::Down) {
+                transformation = Some(Transformation::scale(Vec3::new(1.0, 1.0 - model.scale_speed, 1.0)));
+            }
+        } else if app.keys.down.contains(&Key::Key3) {
+            if app.keys.down.contains(&Key::Up) {
+                transformation = Some(Transformation::scale(Vec3::new(1.0, 1.0, 1.0 + model.scale_speed)));
+            } else if app.keys.down.contains(&Key::Down) {
+                transformation = Some(Transformation::scale(Vec3::new(1.0, 1.0, 1.0 - model.scale_speed)));
+            }
+        } else if app.keys.down.contains(&Key::Up) {
+            transformation = Some(Transformation::translation(&camera_transformation.transform_mat[1] * model.move_speed));
+        } else if app.keys.down.contains(&Key::Down) {
+            transformation = Some(Transformation::translation(&camera_transformation.transform_mat[1] * -model.move_speed));
+        } else if app.keys.down.contains(&Key::Right) {
+            transformation = Some(Transformation::translation(&camera_transformation.transform_mat[0] * model.move_speed));
+        } else if app.keys.down.contains(&Key::Left) {
+            transformation = Some(Transformation::translation(&camera_transformation.transform_mat[0] * -model.move_speed));
+        } else if app.keys.down.contains(&Key::I) {
+            transformation = Some(Transformation::rotation(model.rotation_speed, Vec3::new(1.0, 0.0, 0.0)));
+        } else if app.keys.down.contains(&Key::O) {
+            transformation = Some(Transformation::rotation(model.rotation_speed, Vec3::new(0.0, 1.0, 0.0)));
+        } else if app.keys.down.contains(&Key::P) {
+            transformation = Some(Transformation::rotation(model.rotation_speed, Vec3::new(0.0, 0.0, 1.0)));
         }
-        if app.keys.down.contains(&Key::Down) {
-            model.opts.transformations[idx].translation = &model.opts.transformations[idx].translation + &(&camera_transformation.transform_mat[1] * -model.move_speed);
-        }
-        if app.keys.down.contains(&Key::Right) {
-            model.opts.transformations[idx].translation = &model.opts.transformations[idx].translation + &(&camera_transformation.transform_mat[0] * model.move_speed);
-        }
-        if app.keys.down.contains(&Key::Left) {
-            model.opts.transformations[idx].translation = &model.opts.transformations[idx].translation + &(&camera_transformation.transform_mat[0] * -model.move_speed);
-        }
-        if app.keys.down.contains(&Key::I) {
-            model.opts.transformations[idx].transform_mat = &model.opts.transformations[idx].transform_mat * &Mat3::rotation(model.rotation_speed, Vec3::new(1.0, 0.0, 0.0));
-        }
-        if app.keys.down.contains(&Key::O) {
-            model.opts.transformations[idx].transform_mat = &model.opts.transformations[idx].transform_mat * &Mat3::rotation(model.rotation_speed, Vec3::new(0.0, 1.0, 0.0));
-        }
-        if app.keys.down.contains(&Key::P) {
-            model.opts.transformations[idx].transform_mat = &model.opts.transformations[idx].transform_mat * &Mat3::rotation(model.rotation_speed, Vec3::new(0.0, 0.0, 1.0));
+
+        if let Some(T) = transformation {
+            model.opts.transformations[idx] = &model.opts.transformations[idx] * &T;
         }
     }
 
@@ -297,6 +316,7 @@ fn build_model() -> Model {
         mouse_is_in_window: false,
         scroll_speed: 0.01,
         rotation_speed: 0.1,
+        scale_speed: 0.05,
     }
 }
 
