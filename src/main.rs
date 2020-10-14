@@ -44,6 +44,7 @@ pub struct Model {
     mouse_sensitivity: f32,
     move_speed: f32,
     mouse_is_in_window: bool,
+    skip_next_mouse_event: bool,
 }
 
 
@@ -70,123 +71,156 @@ fn main() {
     // rayon::ThreadPoolBuilder::new().num_threads(4).build_global().unwrap();
     rayon::ThreadPoolBuilder::new().num_threads(16).build_global().unwrap();
 
-    nannou::app(model).run();
+    nannou::app(model).event(update_on_event).run();
 }
 
 fn model(app: &App) -> Model {
-    app.new_window().event(update).size(WIDTH, HEIGHT).view(view).build().unwrap();
+    app
+        .new_window()
+        .title("CS248 Computer Graphics")
+        .size(WIDTH, HEIGHT)
+        // .key_pressed(on_key_press)
+        // .event(update_on_event)
+        .view(view)
+        // .decorations(false)
+        .build()
+        .unwrap();
 
     build_model()
 }
 
 
-fn update(_app: &App, model: &mut Model, event: WindowEvent) {
+fn update_on_event(app: &App, model: &mut Model, event: Event) {
+    // (*_app.main_window()).set_cursor_grab(true);
+
+    // println!("{:?}", app.mouse);
+
+    process_keys(app, model);
+    process_mouse_events(app, model, event);
+    process_mouse_move(app, model);
+    // println!("{:?}", model.opts.camera_opts);
+
+    model.scene = setup_scene(&model.opts);
+}
+
+
+fn process_keys(app: &App, model: &mut Model) {
     let camera_transformation = Transformation::create_look_at(
         &model.opts.camera_opts.position,
         model.opts.camera_opts.yaw,
         model.opts.camera_opts.pitch,
     );
 
-    // println!("{:?}", _app.mouse);
-
-    match event {
-        KeyPressed(key) => {
-            match key {
-                Key::L => {
-                    model.opts.number_of_lights = model.opts.number_of_lights % 2 + 1;
-                },
-                Key::P => {
-                    model.opts.projection_type = match model.opts.projection_type {
-                        ProjectionType::Parallel => ProjectionType::Perspective,
-                        ProjectionType::Perspective => ProjectionType::Parallel,
-                    };
-                },
-                Key::W => model.opts.camera_opts.position = &model.opts.camera_opts.position + &(&camera_transformation.transform_mat[2] * -model.move_speed),
-                Key::S => model.opts.camera_opts.position = &model.opts.camera_opts.position + &(&camera_transformation.transform_mat[2] * model.move_speed),
-                Key::D => model.opts.camera_opts.position = &model.opts.camera_opts.position + &(&camera_transformation.transform_mat[0] * model.move_speed),
-                Key::A => model.opts.camera_opts.position = &model.opts.camera_opts.position + &(&camera_transformation.transform_mat[0] * -model.move_speed),
-                Key::Up => {
-                    if let Some(idx) = model.opts.selected_object_idx {
-                        // println!("{:?}", camera_transformation.transform_mat[1]);
-                        model.opts.transformations[idx].translation = &model.opts.transformations[idx].translation + &(&camera_transformation.transform_mat[1] * model.move_speed);
-                    }
-                },
-                Key::Down => {
-                    if let Some(idx) = model.opts.selected_object_idx {
-                        model.opts.transformations[idx].translation = &model.opts.transformations[idx].translation + &(&camera_transformation.transform_mat[1] * -model.move_speed);
-                    }
-                },
-                Key::Right => {
-                    if let Some(idx) = model.opts.selected_object_idx {
-                        model.opts.transformations[idx].translation = &model.opts.transformations[idx].translation + &(&camera_transformation.transform_mat[0] * model.move_speed);
-                    }
-                },
-                Key::Left => {
-                    if let Some(idx) = model.opts.selected_object_idx {
-                        model.opts.transformations[idx].translation = &model.opts.transformations[idx].translation + &(&camera_transformation.transform_mat[0] * -model.move_speed);
-                    }
-                },
-                Key::Q => *model = build_model(), // Reset
-                _ => {},
-            }
-        },
-        MouseMoved(point) => {
-            if !model.mouse_is_in_window {
-                println!("Mouse is not in the window!");
-                return;
-            }
-            if !model.is_mouse_inited {
-                model.curr_mouse_x = point.x;
-                model.curr_mouse_y = point.y;
-                model.is_mouse_inited = true;
-            }
-
-            let offset_x = (point.x - model.curr_mouse_x) * model.mouse_sensitivity;
-            let offset_y = (model.curr_mouse_y - point.y) * model.mouse_sensitivity;
-
-            model.curr_mouse_x = point.x;
-            model.curr_mouse_y = point.y;
-            model.opts.camera_opts.yaw += offset_x;
-            model.opts.camera_opts.pitch += offset_y;
-
-            model.opts.camera_opts.pitch = model.opts.camera_opts.pitch
-                .min(0.5 * std::f32::consts::PI - 0.001)
-                .max(-0.5 * std::f32::consts::PI + 0.001);
-        },
-        MouseEntered => {
-            model.mouse_is_in_window = true;
-            model.is_mouse_inited = false;
-        },
-        MouseExited => {
-            model.mouse_is_in_window = false;
-            model.is_mouse_inited = false;
-            model.opts.selected_pixel = None;
-            model.opts.specular_strengths = [0.0, 0.0, 0.0];
-        },
-        MousePressed(button) => {
-            if button != MouseButton::Left {
-                return;
-            }
-
-            let i = (model.curr_mouse_x + (WIDTH as f32) / 2.0) as u32;
-            let j = (model.curr_mouse_y + (HEIGHT as f32) / 2.0) as u32;
-
-            // model.scene.compute_pixel(i, j, true);
-
-            if let Some(obj_idx) = model.scene.get_object_idx_at_pixel(i, j) {
-                model.opts.selected_object_idx = Some(obj_idx);
-                model.opts.specular_strengths[obj_idx] = 0.7;
-            } else {
-                model.opts.selected_object_idx = None;
-                model.opts.specular_strengths = [0.0, 0.0, 0.0];
-            }
-
-            dbg!(&model.opts.camera_opts.position);
-        },
-        _ => return,
+    if app.keys.down.contains(&Key::W) {
+        model.opts.camera_opts.position = &model.opts.camera_opts.position + &(&camera_transformation.transform_mat[2] * -model.move_speed);
     }
 
-    model.scene = setup_scene(&model.opts);
+    if app.keys.down.contains(&Key::S) {
+        model.opts.camera_opts.position = &model.opts.camera_opts.position + &(&camera_transformation.transform_mat[2] * model.move_speed);
+    }
+
+    if app.keys.down.contains(&Key::D) {
+        model.opts.camera_opts.position = &model.opts.camera_opts.position + &(&camera_transformation.transform_mat[0] * model.move_speed);
+    }
+
+    if app.keys.down.contains(&Key::A) {
+        model.opts.camera_opts.position = &model.opts.camera_opts.position + &(&camera_transformation.transform_mat[0] * -model.move_speed);
+    }
+
+    if let Some(idx) = model.opts.selected_object_idx {
+        if app.keys.down.contains(&Key::Up) {
+            model.opts.transformations[idx].translation = &model.opts.transformations[idx].translation + &(&camera_transformation.transform_mat[1] * model.move_speed);
+        }
+        if app.keys.down.contains(&Key::Down) {
+                model.opts.transformations[idx].translation = &model.opts.transformations[idx].translation + &(&camera_transformation.transform_mat[1] * -model.move_speed);
+        }
+        if app.keys.down.contains(&Key::Right) {
+                model.opts.transformations[idx].translation = &model.opts.transformations[idx].translation + &(&camera_transformation.transform_mat[0] * model.move_speed);
+        }
+        if app.keys.down.contains(&Key::Left) {
+                model.opts.transformations[idx].translation = &model.opts.transformations[idx].translation + &(&camera_transformation.transform_mat[0] * -model.move_speed);
+        }
+    }
+
+    if app.keys.down.contains(&Key::Q) {
+        *model = build_model();
+    }
+}
+
+
+fn process_mouse_events(app: &App, model: &mut Model, event: Event) {
+    match event {
+        Event::WindowEvent {id: _, simple: window_event } => {
+            if window_event.is_none() {
+                return;
+            }
+
+            match window_event.unwrap() {
+                MouseEntered => {
+                    println!("Mouse entered!");
+                    model.mouse_is_in_window = true;
+                    model.is_mouse_inited = false;
+                },
+                MouseExited => {
+                    model.mouse_is_in_window = false;
+                    model.is_mouse_inited = false;
+                    model.opts.selected_pixel = None;
+                    model.opts.specular_strengths = [0.0, 0.0, 0.0];
+                },
+                MousePressed(button) => {
+                    if button != MouseButton::Left {
+                        return;
+                    }
+
+                    let i = (model.curr_mouse_x + (WIDTH as f32) / 2.0) as u32;
+                    let j = (model.curr_mouse_y + (HEIGHT as f32) / 2.0) as u32;
+
+                    // model.scene.compute_pixel(i, j, true);
+
+                    if let Some(obj_idx) = model.scene.get_object_idx_at_pixel(i, j) {
+                        model.opts.selected_object_idx = Some(obj_idx);
+                        model.opts.specular_strengths[obj_idx] = 0.7;
+                    } else {
+                        model.opts.selected_object_idx = None;
+                        model.opts.specular_strengths = [0.0, 0.0, 0.0];
+                    }
+
+                    dbg!(&model.opts.camera_opts.position);
+                },
+                _ => {}
+            }
+        }
+        _ => {},
+    }
+}
+
+
+fn process_mouse_move(app: &App, model: &mut Model) {
+    if !model.mouse_is_in_window {
+        return;
+    }
+
+    if !model.is_mouse_inited {
+        model.curr_mouse_x = app.mouse.x;
+        model.curr_mouse_y = app.mouse.y;
+        model.is_mouse_inited = true;
+    }
+
+    let offset_x = (app.mouse.x - model.curr_mouse_x) * model.mouse_sensitivity;
+    let offset_y = (model.curr_mouse_y - app.mouse.y) * model.mouse_sensitivity;
+
+    model.curr_mouse_x = app.mouse.x;
+    model.curr_mouse_y = app.mouse.y;
+    model.opts.camera_opts.yaw += offset_x;
+    model.opts.camera_opts.pitch += offset_y;
+
+    model.opts.camera_opts.pitch = model.opts.camera_opts.pitch
+        .min(0.5 * std::f32::consts::PI - 0.001)
+        .max(-0.5 * std::f32::consts::PI + 0.001);
+
+    // (*app.main_window()).set_cursor_position_points(WIDTH as f32 / 2.0, HEIGHT as f32 / 2.0);
+    // model.curr_mouse_x = app.mouse.x;
+    // model.curr_mouse_y = app.mouse.y;
 }
 
 
@@ -237,9 +271,10 @@ fn build_model() -> Model {
         is_mouse_inited: false,
         curr_mouse_x: 0.0,
         curr_mouse_y: 0.0,
-        mouse_sensitivity: 0.001,
-        move_speed: 0.5,
+        mouse_sensitivity: 0.0005,
+        move_speed: 0.1,
         mouse_is_in_window: false,
+        skip_next_mouse_event: false,
     }
 }
 

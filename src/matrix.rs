@@ -215,11 +215,7 @@ mod tests {
 
     #[test]
     fn test_matrix_det() {
-        let identity = Mat3 { rows: [
-            Vec3 {x: 1.0, y: 0.0, z: 0.0},
-            Vec3 {x: 0.0, y: 1.0, z: 0.0},
-            Vec3 {x: 0.0, y: 0.0, z: 1.0},
-        ]};
+        let identity = Mat3::identity();
         let singular_mat = Mat3 { rows: [
             Vec3 {x: 1.0, y: 2.0, z: 0.0},
             Vec3 {x: 1.0, y: 2.0, z: 0.0},
@@ -258,14 +254,7 @@ mod tests {
 
     #[test]
     fn test_transformation() {
-        let transformation = Transformation {
-            transform_mat: Mat3 {rows: [
-                Vec3 {x: 1.0, y: 0.0, z: 0.0},
-                Vec3 {x: 0.0, y: 1.0, z: 0.0},
-                Vec3 {x: 0.0, y: 0.0, z: 1.0},
-            ]},
-            translation: Vec3 {x: 0.0, y: 0.0, z: 0.0},
-        };
+        let transformation = Transformation::identity();
         let point = Point { x: 1.0, y: 1.0, z: 1.0 };
         let point_transformed = &transformation * &point;
 
