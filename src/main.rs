@@ -45,6 +45,7 @@ pub struct Model {
     move_speed: f32,
     mouse_is_in_window: bool,
     scroll_speed: f32,
+    rotation_speed: f32,
 }
 
 
@@ -98,7 +99,7 @@ fn update_on_event(app: &App, model: &mut Model, event: Event) {
     process_mouse_events(app, model, event);
     process_mouse_move(app, model);
 
-    model.opts.transformations[3].transform_mat = &model.opts.transformations[3].transform_mat * &Mat3::rotation(0.3, Vec3::new(0.0, 0.0, 1.0));
+    // model.opts.transformations[3].transform_mat = &model.opts.transformations[3].transform_mat * &Mat3::rotation(0.3, Vec3::new(0.0, 0.0, 1.0));
 
     model.scene = setup_scene(&model.opts);
 }
@@ -132,13 +133,22 @@ fn process_keys(app: &App, model: &mut Model) {
             model.opts.transformations[idx].translation = &model.opts.transformations[idx].translation + &(&camera_transformation.transform_mat[1] * model.move_speed);
         }
         if app.keys.down.contains(&Key::Down) {
-                model.opts.transformations[idx].translation = &model.opts.transformations[idx].translation + &(&camera_transformation.transform_mat[1] * -model.move_speed);
+            model.opts.transformations[idx].translation = &model.opts.transformations[idx].translation + &(&camera_transformation.transform_mat[1] * -model.move_speed);
         }
         if app.keys.down.contains(&Key::Right) {
-                model.opts.transformations[idx].translation = &model.opts.transformations[idx].translation + &(&camera_transformation.transform_mat[0] * model.move_speed);
+            model.opts.transformations[idx].translation = &model.opts.transformations[idx].translation + &(&camera_transformation.transform_mat[0] * model.move_speed);
         }
         if app.keys.down.contains(&Key::Left) {
-                model.opts.transformations[idx].translation = &model.opts.transformations[idx].translation + &(&camera_transformation.transform_mat[0] * -model.move_speed);
+            model.opts.transformations[idx].translation = &model.opts.transformations[idx].translation + &(&camera_transformation.transform_mat[0] * -model.move_speed);
+        }
+        if app.keys.down.contains(&Key::I) {
+            model.opts.transformations[idx].transform_mat = &model.opts.transformations[idx].transform_mat * &Mat3::rotation(model.rotation_speed, Vec3::new(1.0, 0.0, 0.0));
+        }
+        if app.keys.down.contains(&Key::O) {
+            model.opts.transformations[idx].transform_mat = &model.opts.transformations[idx].transform_mat * &Mat3::rotation(model.rotation_speed, Vec3::new(0.0, 1.0, 0.0));
+        }
+        if app.keys.down.contains(&Key::P) {
+            model.opts.transformations[idx].transform_mat = &model.opts.transformations[idx].transform_mat * &Mat3::rotation(model.rotation_speed, Vec3::new(0.0, 0.0, 1.0));
         }
     }
 
@@ -286,6 +296,7 @@ fn build_model() -> Model {
         move_speed: 0.1,
         mouse_is_in_window: false,
         scroll_speed: 0.01,
+        rotation_speed: 0.1,
     }
 }
 
