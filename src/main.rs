@@ -55,8 +55,10 @@ pub struct RenderOptions {
     camera_opts: CameraOptions,
     selected_pixel: Option<(u32, u32)>,
     selected_object_idx: Option<usize>,
-    transformations: [Transformation; 3],
-    specular_strengths: [f32; 3],
+    transformations: [Transformation; 4],
+    specular_strengths: [f32; 4],
+    spheres_fly_radius: f32,
+    spheres_fly_speed: f32,
 }
 
 #[derive(Debug, Clone)]
@@ -93,8 +95,7 @@ fn model(app: &App) -> Model {
 fn update_on_event(app: &App, model: &mut Model, event: Event) {
     // (*_app.main_window()).set_cursor_grab(true);
 
-    // println!("{:?}", app.mouse);
-
+    model.opts.update_transformations_on_time(app.time);
     process_keys(app, model);
     process_mouse_events(app, model, event);
     process_mouse_move(app, model);
@@ -165,7 +166,7 @@ fn process_mouse_events(app: &App, model: &mut Model, event: Event) {
                     model.mouse_is_in_window = false;
                     model.is_mouse_inited = false;
                     model.opts.selected_pixel = None;
-                    model.opts.specular_strengths = [0.0, 0.0, 0.0];
+                    model.opts.specular_strengths = [0.0, 0.0, 0.0, 0.0];
                 },
                 MousePressed(button) => {
                     if button != MouseButton::Left {
@@ -182,7 +183,7 @@ fn process_mouse_events(app: &App, model: &mut Model, event: Event) {
                         model.opts.specular_strengths[obj_idx] = 0.7;
                     } else {
                         model.opts.selected_object_idx = None;
-                        model.opts.specular_strengths = [0.0, 0.0, 0.0];
+                        model.opts.specular_strengths = [0.0, 0.0, 0.0, 0.0];
                     }
 
                     dbg!(&model.opts.camera_opts.position);
@@ -231,7 +232,6 @@ fn view(app: &App, model: &Model, frame: Frame) {
     let start = Instant::now();
     let img = render_model(model);
     let duration = start.elapsed();
-    // println!("Frame rendering time: {:?}", duration);
 
     unsafe {
         if NUM_FRAMES_SINCE_LAST_SEC == 0 && LAST_SEC % 10 == 0 {
@@ -315,35 +315,40 @@ fn setup_scene(render_options: &RenderOptions) -> Scene {
     let plane_transform = &lookat_transform * &render_options.transformations[0];
     let transformed_plane = TransformedSurface::new(plane_transform, plane);
 
-    let mut sphere_a = Sphere::new();
+    let mut sphere_a = Sphere::new(Color {r: 0.0, g: 0.0, b: 1.0});
     sphere_a.specular_strength = render_options.specular_strengths[1];
     let sphere_a_transform = &lookat_transform * &render_options.transformations[1];
     let transformed_sphere_a = TransformedSurface::new(sphere_a_transform, sphere_a);
 
-    let sphere_b = Sphere {
-        center: Point {x: -1.0, y: 1.0, z: 0.0},
-        radius: 0.25,
-        color: Color {r: 1.0, g: 0.0, b: 0.0},
-        specular_strength: render_options.specular_strengths[2],
-    };
+    let sphere_b = Sphere::new(Color {r: 1.0, g: 0.0, b: 0.0});
     let sphere_b_transform = &lookat_transform * &render_options.transformations[2];
     let transformed_sphere_b = TransformedSurface::new(sphere_b_transform, sphere_b);
 
-    // let cone = Cone {
-    //     apex: Point {x: 0.0, y: 0.0, z: 0.0},
-    //     half_angle: 0.5,
-    //     height: 0.5,
-    //     color: Color {r: 0.0, g: 1.0, b: 0.0},
-    //     specular_strength: render_options.specular_strengths[2],
+    // let sphere_c = Sphere {
+    //     center: Point {x: -1.0, y: 1.0, z: 0.0},
+    //     radius: 0.25,
+    //     color: Color {r: 1.0, g: 0.0, b: 0.0},
+    //     specular_strength: render_options.specular_strengths[3],
     // };
-    // let cone_transform = &lookat_transform * &render_options.transformations[2];
-    // let transformed_cone = TransformedSurface::new(cone_transform, &cone);
+    // let sphere_c_transform = &lookat_transform * &render_options.transformations[3];
+    // let transformed_sphere_c = TransformedSurface::new(sphere_c_transform, sphere_c);
+
+    let cone = Cone {
+        apex: Point {x: 0.0, y: 0.0, z: 0.0},
+        half_angle: 0.5,
+        height: 0.5,
+        color: Color {r: 0.0, g: 1.0, b: 0.0},
+        specular_strength: render_options.specular_strengths[3],
+    };
+    let cone_transform = &lookat_transform * &render_options.transformations[3];
+    let transformed_cone = TransformedSurface::new(cone_transform, cone);
 
     Scene {
         objects: vec![
             Box::new(transformed_plane),
             Box::new(transformed_sphere_a),
             Box::new(transformed_sphere_b),
+            Box::new(transformed_cone),
         ],
         camera: Camera::from_z_position(-1.0, render_options.projection_type, WIDTH, HEIGHT),
         background_color: Color {r: 0.204, g: 0.596, b: 0.86},
@@ -361,7 +366,9 @@ impl RenderOptions {
             number_of_lights: 1,
             selected_pixel: None,
             selected_object_idx: None,
-            specular_strengths: [0.0, 0.0, 0.0],
+            spheres_fly_radius: 3.0,
+            spheres_fly_speed: 0.3,
+            specular_strengths: [0.0, 0.0, 0.0, 0.0],
             camera_opts: CameraOptions {
                 yaw: -0.5 * std::f32::consts::PI,
                 pitch: 0.0,
@@ -370,22 +377,25 @@ impl RenderOptions {
             transformations: [
                 Transformation::identity(),
                 Transformation {
-                    transform_mat: Mat3 {rows: [
-                        Vec3 {x: 0.25, y: 0.0, z: 0.0},
-                        Vec3 {x: 0.0, y: 0.25, z: 0.0},
-                        Vec3 {x: 0.0, y: 0.0, z: 0.25},
-                    ]},
-                    translation: Vec3 {x: 0.0, y: 0.0, z: 0.0},
+                    transform_mat: &Mat3::identity() * 0.25,
+                    translation: Vec3::new(0.0, 0.0, 0.0),
                 },
                 Transformation {
-                    transform_mat: Mat3 {rows: [
-                        Vec3 {x: 1.0, y: 0.0, z: 0.0},
-                        Vec3 {x: 0.0, y: 0.3, z: 0.0},
-                        Vec3 {x: 0.0, y: 0.0, z: 1.0},
-                    ]},
-                    translation: Vec3 {x: -1.0, y: 0.0, z: 0.0},
+                    transform_mat: &Mat3::identity() * 0.25,
+                    translation: Vec3::new(0.0, 0.0, 0.0),
+                },
+                Transformation {
+                    transform_mat: Mat3::identity(),
+                    translation: Vec3::new(0.0, 0.0, 0.0),
                 }
             ],
         }
+    }
+
+    fn update_transformations_on_time(&mut self, time: f32) {
+        self.transformations[1].translation.x = (time * self.spheres_fly_speed).sin() * self.spheres_fly_radius;
+        self.transformations[1].translation.z = (time * self.spheres_fly_speed).cos() * self.spheres_fly_radius;
+        self.transformations[2].translation.x = -(time * self.spheres_fly_speed).sin() * self.spheres_fly_radius;
+        self.transformations[2].translation.z = -(time * self.spheres_fly_speed).cos() * self.spheres_fly_radius;
     }
 }

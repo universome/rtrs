@@ -7,7 +7,7 @@ pub struct Mat3 {
 }
 
 impl Mat3 {
-    fn identity() -> Self {
+    pub fn identity() -> Self {
         Mat3 {rows: [
             Vec3::new(1.0, 0.0, 0.0),
             Vec3::new(0.0, 1.0, 0.0),
@@ -120,6 +120,19 @@ impl ops::Mul<&Mat3> for &Mat3 {
             self * &other_t.rows[0],
             self * &other_t.rows[1],
             self * &other_t.rows[2],
+        ]}
+    }
+}
+
+
+impl ops::Mul<f32> for &Mat3 {
+    type Output = Mat3;
+
+    fn mul(self, scalar: f32) -> Mat3 {
+        Mat3 {rows: [
+            &self.rows[0] * scalar,
+            &self.rows[1] * scalar,
+            &self.rows[2] * scalar,
         ]}
     }
 }

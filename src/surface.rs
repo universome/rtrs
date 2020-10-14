@@ -24,11 +24,11 @@ pub struct Sphere {
 }
 
 impl Sphere {
-    pub fn new() -> Self {
+    pub fn new(color: Color) -> Self {
         Sphere {
             center: Point {x: 0.0, y: 0.0, z: 0.0},
             radius: 1.0,
-            color: Color {r: 0.0, g: 0.0, b: 1.0},
+            color: color,
             specular_strength: 0.0,
         }
     }
