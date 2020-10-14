@@ -15,6 +15,26 @@ impl Mat3 {
         ]}
     }
 
+    fn rotation(angle: f32, axis: Vec3) -> Self {
+        Mat3 {rows: [
+            Vec3::new(
+                (axis.x.powi(2) + (axis.y.powi(2) + axis.z.powi(2)) * angle.cos()) / axis.norm_squared(),
+                (axis.x * axis.y * (1.0 - angle.cos()) - axis.z * axis.norm() * angle.sin()) / axis.norm_squared(),
+                (axis.x * axis.z * (1.0 - angle.cos()) + axis.y * axis.norm() * angle.sin()) / axis.norm_squared(),
+            ),
+            Vec3::new(
+                (axis.x * axis.y * (1.0 - angle.cos()) + axis.z * axis.norm() * angle.sin()) / axis.norm_squared(),
+                (axis.y.powi(2) + (axis.x.powi(2) + axis.z.powi(2)) * angle.cos()) / axis.norm_squared(),
+                (axis.y * axis.z * (1.0 - angle.cos()) - axis.x * axis.norm() * angle.sin()) / axis.norm_squared(),
+            ),
+            Vec3::new(
+                (axis.x * axis.z * (1.0 - angle.cos()) - axis.y * axis.norm() * angle.sin()) / axis.norm_squared(),
+                (axis.y * axis.z * (1.0 - angle.cos()) + axis.x * axis.norm() * angle.sin()) / axis.norm_squared(),
+                (axis.z.powi(2) + (axis.x.powi(2) + axis.y.powi(2)) * angle.cos()) / axis.norm_squared(),
+            )
+        ]}
+    }
+
     fn det(&self) -> f32 {
         self[0][0] * (self[1][1] * self[2][2] - self[2][1] * self[1][2]) -
         self[0][1] * (self[1][0] * self[2][2] - self[1][2] * self[2][0]) +
@@ -252,5 +272,17 @@ mod tests {
         assert_eq!(point_transformed.x, 1.0);
         assert_eq!(point_transformed.y, 1.0);
         assert_eq!(point_transformed.z, 1.0);
+    }
+
+    #[test]
+    fn test_rotation() {
+        let rotation = Mat3::rotation(std::f32::consts::PI * 0.5, Vec3::new(0.0, 1.0, 0.0));
+        let point = Point {x: 1.0, y: 0.0, z: 0.0};
+        let point_rotated = &rotation * &point;
+
+        assert!(approx_eq!(f32, rotation.det(), 1.0, epsilon=0.0001));
+        assert!(approx_eq!(f32, point_rotated.x, 0.0, epsilon=0.0001));
+        assert!(approx_eq!(f32, point_rotated.y, 0.0, epsilon=0.0001));
+        assert!(approx_eq!(f32, point_rotated.z, -1.0, epsilon=0.0001));
     }
 }

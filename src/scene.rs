@@ -1,6 +1,7 @@
 use std::ptr;
 
-use crate::surface::*;
+use crate::camera::{Camera};
+use crate::surface::{Surface};
 use crate::basics::*;
 use crate::matrix::{Mat3};
 
@@ -15,32 +16,6 @@ pub struct Scene {
 }
 
 
-#[derive(Debug, Clone, Copy)]
-pub enum ProjectionType {Parallel, Perspective}
-
-#[derive(Debug, Clone)]
-pub struct Camera {
-    origin: Point,
-    direction: Vec3,
-    up: Vec3,
-    right: Vec3,
-    projection_type: ProjectionType,
-    viewing_plane: ViewingPlane,
-}
-
-
-#[derive(Debug, Clone)]
-pub struct ViewingPlane {
-    pub z: f32,
-    pub x_min: f32,
-    pub x_max: f32,
-    pub y_min: f32,
-    pub y_max: f32,
-    pub width: u32,
-    pub height: u32,
-}
-
-
 impl Scene {
     pub fn get_object_idx_at_pixel(&self, i: u32, j: u32) -> Option<usize> {
         let ray = self.camera.generate_ray(i, j);
@@ -48,7 +23,7 @@ impl Scene {
         let mut min_t = f32::INFINITY;
 
         for (idx, object) in self.objects.iter().enumerate() {
-            if let Some(t) = object.compute_hit(&ray) {
+            if let Some(t) = object.compute_hit(&ray, false) {
                 if t < min_t {
                     closest_obj_idx = Some(idx);
                     min_t = t;
@@ -59,17 +34,20 @@ impl Scene {
         closest_obj_idx
     }
 
-    pub fn compute_pixel(&self, i: u32, j: u32) -> Color {
+    pub fn compute_pixel(&self, i: u32, j: u32, debug: bool) -> Color {
         // let closest_obj = self.get_object_at_pixel(i, j);
-        let ray = self.camera.generate_ray(i, j);
+        let ray_ws = self.camera.generate_ray(i, j);
+        if debug {
+            dbg!(&ray_ws);
+        }
         let mut closest_obj = None;
-        let mut min_t = f32::INFINITY;
+        let mut min_t_ws = f32::INFINITY;
 
         for object in self.objects.iter() {
-            if let Some(t) = object.compute_hit(&ray) {
-                if t < min_t {
-                    closest_obj = Some((object, t));
-                    min_t = t;
+            if let Some(t_ws) = object.compute_hit(&ray_ws, debug) {
+                if t_ws < min_t_ws {
+                    closest_obj = Some((object, t_ws));
+                    min_t_ws = t_ws;
                 }
             }
         }
@@ -78,37 +56,49 @@ impl Scene {
             return self.background_color.clone();
         }
 
-        // TODO: do not recompute the ray
-        let ray = self.camera.generate_ray(i, j);
-        let (obj, min_t) = closest_obj.unwrap();
+        let (obj, min_t_ws) = closest_obj.unwrap();
         let mut color = &obj.get_color() * self.ambient_strength;
-        let point = ray.compute_point(min_t); // TODO: do not recompute the hit point
-        let normal = obj.compute_normal(&point);
+        let hit_point_ws = ray_ws.compute_point(min_t_ws); // TODO: do not recompute the hit hit_point
+        if debug {
+            dbg!(&min_t_ws, &hit_point_ws);
+        }
+        let normal_ws = obj.compute_normal(&hit_point_ws);
 
-        for light in self.lights.iter() {
-            let distance_to_light = (&light.location - &point).norm();
-            let light_dir = (&light.location - &point).normalize();
+        for light_ws in self.lights.iter() {
+            // let light_ws = Light {
+            //     location: &light_ws.location,
+            //     color: light_ws.color.clone(),
+            // };
+            let distance_to_light = (&light_ws.location - &hit_point_ws).norm();
+            let light_dir = (&light_ws.location - &hit_point_ws).normalize();
             let shadow_ray = Ray {
-                origin: point.clone(),
+                origin: &hit_point_ws.clone() + &(&light_dir.clone() * 0.0001),
                 direction: light_dir.clone(),
             };
 
+            if debug {
+                dbg!(&shadow_ray);
+            }
             if self.objects.iter()
-                .filter(|o| !ptr::eq(*o, &*obj))
-                .any(|o| o.compute_hit(&shadow_ray).filter(|t| t <= &distance_to_light).is_some()) {
+                // .filter(|o| !ptr::eq(*o, &*obj)) TODO: why did we need this?
+                .any(|o| o.compute_hit(&shadow_ray, debug).filter(|t| t <= &distance_to_light).is_some()) {
                     continue;
             }
 
-            let diffuse_cos = normal.dot_product(&light_dir.normalize()).max(0.0);
-            let diffuse_light_color = &light.color * (diffuse_cos * self.diffuse_strength);
+            let diffuse_cos = normal_ws.dot_product(&light_dir.normalize()).max(0.0);
+            let diffuse_light_color = &light_ws.color * (diffuse_cos * self.diffuse_strength);
 
             // Specular light component
-            let eye_dir = (&self.camera.origin - &point).normalize();
+            let eye_dir = (&self.camera.origin - &hit_point_ws).normalize();
             let half_vector = (eye_dir + light_dir).normalize();
-            let spec_strength = obj.get_specular_strength() * normal.dot_product(&half_vector).max(0.0).powf(64.0);
+            let spec_strength = obj.get_specular_strength() * normal_ws.dot_product(&half_vector).max(0.0).powf(64.0);
             let spec_color = (&Color {r: 1.0, g: 1.0, b: 1.0}) * spec_strength;
 
             color = (&(&color + &diffuse_light_color) + &spec_color).clamp();
+
+            // if debug {
+            //     dbg!("Adding color: {:?}", &color);
+            // }
         }
 
         color
@@ -116,60 +106,10 @@ impl Scene {
 }
 
 
-impl Camera {
-    pub fn from_z_position(z: f32, projection_type: ProjectionType, width: u32, height: u32) -> Camera {
-        Camera {
-            origin: Point {x: 0.0, y: 0.0, z: z},
-            direction: Vec3 {x: 0.0, y: 0.0, z: 1.0},
-            up: Vec3 {x: 0.0, y: 1.0, z: 0.0},
-            right: Vec3 {x: 1.0, y: 0.0, z: 0.0},
-            projection_type: projection_type,
-            viewing_plane: ViewingPlane {
-                z: z + 0.5,
-                x_min: -0.1,
-                x_max: 0.1,
-                y_min: -0.075,
-                y_max: 0.075,
-                width: width,
-                height: height,
-            }
-        }
-    }
-
-    pub fn generate_ray(&self, i: u32, j: u32) -> Ray {
-        let (u, v) = self.viewing_plane.generate_uv_coords(i, j);
-        let d = self.viewing_plane.z - self.origin.z;
-
-        match self.projection_type {
-            ProjectionType::Perspective => Ray {
-                // TODO: actually, we do not need to clone anything here, right?
-                origin: self.origin.clone(),
-                direction: &self.direction * (-d) + &self.right * u + &self.up * v
-            },
-            ProjectionType::Parallel => Ray {
-                origin: (&self.origin + &(&self.right * u) + &self.up * v).into(),
-                direction: &self.direction * (-1.0),
-            }
-        }
-    }
-}
-
-
-impl ViewingPlane {
-    pub fn generate_uv_coords(&self, i: u32, j: u32) -> (f32, f32) {
-        let x_dist = self.x_max - self.x_min;
-        let y_dist = self.y_max - self.y_min;
-        let u = self.x_min + x_dist * (i as f32 + 0.5) / (self.width as f32);
-        let v = self.y_min + y_dist * (j as f32 + 0.5) / (self.height as f32);
-
-        (u, v)
-    }
-}
-
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::surface::Sphere;
 
     #[test]
     fn test_sphere() {
@@ -201,24 +141,7 @@ mod tests {
             direction: Vec3 { x: 0.0, y: 1.0 / 2.0_f32.sqrt(), z: 1.0 / 2.0_f32.sqrt() }
             // direction: (&Vec3 { x: 0.0, y: 1.0, z: 1.0 }).normalize()
         };
-        assert_eq!(sphere.compute_hit(&ray_a), Some(4.0));
-        assert!(approx_eq!(f32, sphere.compute_hit(&ray_b).unwrap(), 1.0));
-    }
-
-    #[test]
-    fn test_viewing_plane() {
-        let vp = ViewingPlane {
-            z: 0.0,
-            x_min: -2.0,
-            x_max: 2.0,
-            y_min: -1.5,
-            y_max: 1.5,
-            width: 640,
-            height: 480,
-        };
-
-        assert_eq!(vp.generate_uv_coords(0, 0), (-1.996875, -1.496875));
-        assert_eq!(vp.generate_uv_coords(320, 240), (0.0031249523, 0.0031249523));
-        assert_eq!(vp.generate_uv_coords(640, 480), (2.0031252, 1.503125));
+        assert_eq!(sphere.compute_hit(&ray_a, false), Some(4.0));
+        assert!(approx_eq!(f32, sphere.compute_hit(&ray_b, false).unwrap(), 1.0));
     }
 }

@@ -155,10 +155,10 @@ impl ops::Sub<&Point> for &Point {
 }
 
 impl ops::Add<&Vec3> for &Point {
-    type Output = Vec3;
+    type Output = Point;
 
-    fn add(self, direction: &Vec3) -> Vec3 {
-        Vec3 {
+    fn add(self, direction: &Vec3) -> Point {
+        Point {
             x: self.x + direction.x,
             y: self.y + direction.y,
             z: self.z + direction.z,

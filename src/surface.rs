@@ -8,7 +8,7 @@ static MIN_RAY_T: f32 = 0.0001;
 
 
 pub trait Surface: Debug + Sync {
-    fn compute_hit(&self, ray: &Ray) -> Option<f32>;
+    fn compute_hit(&self, ray: &Ray, debug: bool) -> Option<f32>;
     fn compute_normal(&self, point: &Point) -> Vec3;
     fn get_color(&self) -> Color;
     fn get_specular_strength(&self) -> f32;
@@ -35,7 +35,7 @@ impl Sphere {
 }
 
 impl Surface for Sphere {
-    fn compute_hit(&self, ray: &Ray) -> Option<f32> {
+    fn compute_hit(&self, ray: &Ray, debug: bool) -> Option<f32> {
         // debug_assert!(is_unit_length(ray.direction));
         let orig_to_c = &self.center - &ray.origin;
         let roots = find_square_roots(
@@ -79,7 +79,7 @@ impl Plane {
 
 
 impl Surface for Plane {
-    fn compute_hit(&self, ray: &Ray) -> Option<f32> {
+    fn compute_hit(&self, ray: &Ray, debug: bool) -> Option<f32> {
         compute_plane_hit(&self.bias, &self.normal, ray)
     }
 
@@ -104,7 +104,7 @@ pub struct Ellipsoid {
 }
 
 impl Surface for Ellipsoid {
-    fn compute_hit(&self, ray: &Ray) -> Option<f32> {
+    fn compute_hit(&self, ray: &Ray, debug: bool) -> Option<f32> {
         let scale_inv = self.scale.compute_inverse();
         let orig_to_c_scaled = &scale_inv * &(&self.center - &ray.origin);
         let ray_dir_scaled = &scale_inv * &ray.direction;
@@ -180,7 +180,7 @@ impl Cone {
 
 
 impl Surface for Cone {
-    fn compute_hit(&self, ray: &Ray) -> Option<f32> {
+    fn compute_hit(&self, ray: &Ray, debug: bool) -> Option<f32> {
         let cone_hit = self.compute_cone_hit(ray);
         let slab_hit = self.compute_slab_hit(ray);
 
@@ -247,16 +247,19 @@ impl<S: Surface> TransformedSurface<S> {
 }
 
 
-
 impl<S: Surface> Surface for TransformedSurface<S> {
-    fn compute_hit(&self, ray: &Ray) -> Option<f32> {
-        let ray_transformed = Ray {
+    fn compute_hit(&self, ray: &Ray, debug: bool) -> Option<f32> {
+        let ray_os = Ray {
             origin: &self.transformation_inv * &ray.origin,
-            direction: &self.transformation_inv * &ray.direction,
+            direction: (&self.transformation_inv * &ray.direction).normalize(),
         };
 
-        if let Some(t) = self.surface.compute_hit(&ray_transformed) {
-            let hit_point = &self.transformation * &ray_transformed.compute_point(t);
+        if debug {
+            dbg!(&ray_os);
+        }
+
+        if let Some(t) = self.surface.compute_hit(&ray_os, debug) {
+            let hit_point = &self.transformation * &ray_os.compute_point(t);
 
             return Some(ray.compute_t(&hit_point));
         }
@@ -265,8 +268,9 @@ impl<S: Surface> Surface for TransformedSurface<S> {
     }
 
     fn compute_normal(&self, point: &Point) -> Vec3 {
-        let point_transformed = &self.transformation_inv * point;
-        let normal = self.surface.compute_normal(&point_transformed);
+        // TODO: just return it in compute_hit
+        let point_os = &self.transformation_inv * point;
+        let normal = self.surface.compute_normal(&point_os);
 
         (&self.transform_inv_t * &normal).normalize()
     }
