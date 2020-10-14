@@ -3,11 +3,10 @@ use std::ptr;
 use crate::surface::*;
 use crate::basics::*;
 use crate::matrix::{Mat3};
-use crate::render::{CameraOptions};
 
 
-pub struct Scene<'a> {
-    pub objects: Vec<&'a dyn Surface>,
+pub struct Scene {
+    pub objects: Vec<Box<dyn Surface>>,
     pub camera: Camera,
     pub background_color: Color,
     pub lights: Vec<Light>,
@@ -42,8 +41,26 @@ pub struct ViewingPlane {
 }
 
 
-impl Scene<'_> {
+impl Scene {
+    // pub fn get_object_at_pixel(&self, i: u32, j: u32) -> Option<(&dyn Surface, f32)> {
+    //     let ray = self.camera.generate_ray(i, j);
+    //     let mut closest_obj = None;
+    //     let mut min_t = f32::INFINITY;
+
+    //     for object in self.objects.iter() {
+    //         if let Some(t) = object.compute_hit(&ray) {
+    //             if t < min_t {
+    //                 closest_obj = Some((*object, t));
+    //                 min_t = t;
+    //             }
+    //         }
+    //     }
+
+    //     closest_obj
+    // }
+
     pub fn compute_pixel(&self, i: u32, j: u32) -> Color {
+        // let closest_obj = self.get_object_at_pixel(i, j);
         let ray = self.camera.generate_ray(i, j);
         let mut closest_obj = None;
         let mut min_t = f32::INFINITY;
@@ -51,48 +68,50 @@ impl Scene<'_> {
         for object in self.objects.iter() {
             if let Some(t) = object.compute_hit(&ray) {
                 if t < min_t {
-                    closest_obj = Some(object);
+                    closest_obj = Some((object, t));
                     min_t = t;
                 }
             }
         }
 
-        if closest_obj.is_some() {
-            let obj = closest_obj.unwrap();
-            let mut color = &obj.get_color() * self.ambient_strength;
-            let point = ray.compute_point(min_t);
-            let normal = obj.compute_normal(&point);
+        if closest_obj.is_none() {
+            return self.background_color.clone();
+        }
 
-            for light in self.lights.iter() {
-                let distance_to_light = (&light.location - &point).norm();
-                let light_dir = (&light.location - &point).normalize();
-                let shadow_ray = Ray {
-                    origin: point.clone(),
-                    direction: light_dir.clone(),
-                };
+        // TODO: do not recompute the ray
+        let ray = self.camera.generate_ray(i, j);
+        let (obj, min_t) = closest_obj.unwrap();
+        let mut color = &obj.get_color() * self.ambient_strength;
+        let point = ray.compute_point(min_t); // TODO: do not recompute the hit point
+        let normal = obj.compute_normal(&point);
 
-                if self.objects.iter()
-                    .filter(|o| !ptr::eq(*o, obj))
-                    .any(|o| o.compute_hit(&shadow_ray).filter(|t| t <= &distance_to_light).is_some()) {
-                        continue;
-                }
+        for light in self.lights.iter() {
+            let distance_to_light = (&light.location - &point).norm();
+            let light_dir = (&light.location - &point).normalize();
+            let shadow_ray = Ray {
+                origin: point.clone(),
+                direction: light_dir.clone(),
+            };
 
-                let diffuse_cos = normal.dot_product(&light_dir.normalize()).max(0.0);
-                let diffuse_light_color = &light.color * (diffuse_cos * self.diffuse_strength);
-
-                // Specular light component
-                let eye_dir = (&self.camera.origin - &point).normalize();
-                let half_vector = (eye_dir + light_dir).normalize();
-                let spec_strength = obj.get_specular_strength() * normal.dot_product(&half_vector).max(0.0).powf(64.0);
-                let spec_color = (&Color {r: 1.0, g: 1.0, b: 1.0}) * spec_strength;
-
-                color = (&(&color + &diffuse_light_color) + &spec_color).clamp();
+            if self.objects.iter()
+                .filter(|o| !ptr::eq(*o, &*obj))
+                .any(|o| o.compute_hit(&shadow_ray).filter(|t| t <= &distance_to_light).is_some()) {
+                    continue;
             }
 
-            color
-        } else {
-            self.background_color.clone()
+            let diffuse_cos = normal.dot_product(&light_dir.normalize()).max(0.0);
+            let diffuse_light_color = &light.color * (diffuse_cos * self.diffuse_strength);
+
+            // Specular light component
+            let eye_dir = (&self.camera.origin - &point).normalize();
+            let half_vector = (eye_dir + light_dir).normalize();
+            let spec_strength = obj.get_specular_strength() * normal.dot_product(&half_vector).max(0.0).powf(64.0);
+            let spec_color = (&Color {r: 1.0, g: 1.0, b: 1.0}) * spec_strength;
+
+            color = (&(&color + &diffuse_light_color) + &spec_color).clamp();
         }
+
+        color
     }
 }
 

@@ -202,16 +202,28 @@ impl Surface for Cone {
 }
 
 #[derive(Debug, Clone)]
-pub struct TransformedSurface<'a> {
+pub struct TransformedSurface<S> where S: Surface {
     transformation: Transformation,
     transformation_inv: Transformation,
     transform_inv_t: Mat3,
-    surface: &'a dyn Surface,
+    surface: S,
 }
 
 
-impl<'b> TransformedSurface<'b> {
-    pub fn new<'a>(transformation: Transformation, surface: &'a dyn Surface) -> TransformedSurface {
+// impl<S: Surface> TransformedSurface<S> {
+//     pub fn new<T: Surface>(transformation: Transformation, surface: T) -> TransformedSurface<T> {
+//         let transformation_inv = transformation.compute_inverse();
+
+//         TransformedSurface {
+//             transformation: transformation,
+//             transform_inv_t: transformation_inv.transform_mat.transpose(),
+//             transformation_inv: transformation_inv,
+//             surface: surface,
+//         }
+//     }
+// }
+impl<S: Surface> TransformedSurface<S> {
+    pub fn new(transformation: Transformation, surface: S) -> TransformedSurface<S> {
         let transformation_inv = transformation.compute_inverse();
 
         TransformedSurface {
@@ -224,7 +236,8 @@ impl<'b> TransformedSurface<'b> {
 }
 
 
-impl<'a> Surface for TransformedSurface<'a> {
+
+impl<S: Surface> Surface for TransformedSurface<S> {
     fn compute_hit(&self, ray: &Ray) -> Option<f32> {
         let ray_transformed = Ray {
             origin: &self.transformation_inv * &ray.origin,
