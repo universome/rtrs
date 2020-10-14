@@ -37,9 +37,6 @@ impl Scene {
     pub fn compute_pixel(&self, i: u32, j: u32, debug: bool) -> Color {
         // let closest_obj = self.get_object_at_pixel(i, j);
         let ray_ws = self.camera.generate_ray(i, j);
-        if debug {
-            dbg!(&ray_ws);
-        }
         let mut closest_obj = None;
         let mut min_t_ws = f32::INFINITY;
 
@@ -59,16 +56,10 @@ impl Scene {
         let (obj, min_t_ws) = closest_obj.unwrap();
         let mut color = &obj.get_color() * self.ambient_strength;
         let hit_point_ws = ray_ws.compute_point(min_t_ws); // TODO: do not recompute the hit hit_point
-        if debug {
-            dbg!(&min_t_ws, &hit_point_ws);
-        }
+
         let normal_ws = obj.compute_normal(&hit_point_ws);
 
         for light_ws in self.lights.iter() {
-            // let light_ws = Light {
-            //     location: &light_ws.location,
-            //     color: light_ws.color.clone(),
-            // };
             let distance_to_light = (&light_ws.location - &hit_point_ws).norm();
             let light_dir = (&light_ws.location - &hit_point_ws).normalize();
             let shadow_ray = Ray {
@@ -76,9 +67,6 @@ impl Scene {
                 direction: light_dir.clone(),
             };
 
-            if debug {
-                dbg!(&shadow_ray);
-            }
             if self.objects.iter()
                 // .filter(|o| !ptr::eq(*o, &*obj)) TODO: why did we need this?
                 .any(|o| o.compute_hit(&shadow_ray, debug).filter(|t| t <= &distance_to_light).is_some()) {
@@ -95,10 +83,6 @@ impl Scene {
             let spec_color = (&Color {r: 1.0, g: 1.0, b: 1.0}) * spec_strength;
 
             color = (&(&color + &diffuse_light_color) + &spec_color).clamp();
-
-            // if debug {
-            //     dbg!("Adding color: {:?}", &color);
-            // }
         }
 
         color

@@ -57,8 +57,8 @@ pub struct RenderOptions {
     camera_opts: CameraOptions,
     selected_pixel: Option<(u32, u32)>,
     selected_object_idx: Option<usize>,
-    transformations: [Transformation; 4],
-    specular_strengths: [f32; 4],
+    transformations: [Transformation; 5],
+    specular_strengths: [f32; 5],
     spheres_fly_radius: f32,
     spheres_fly_speed: f32,
     fov: f32,
@@ -129,6 +129,10 @@ fn process_keys(app: &App, model: &mut Model) {
         model.opts.camera_opts.position = &model.opts.camera_opts.position + &(&camera_transformation.transform_mat[0] * -model.move_speed);
     }
 
+    if app.keys.down.contains(&Key::L) {
+        model.opts.selected_object_idx = Some(4); // Selecting the light
+    }
+
     if let Some(idx) = model.opts.selected_object_idx {
         let mut transformation = None;
 
@@ -194,7 +198,7 @@ fn process_mouse_events(app: &App, model: &mut Model, event: Event) {
                     model.mouse_is_in_window = false;
                     model.is_mouse_inited = false;
                     model.opts.selected_pixel = None;
-                    model.opts.specular_strengths = [0.0, 0.0, 0.0, 0.0];
+                    model.opts.specular_strengths = [0.0, 0.0, 0.0, 0.0, 1.0];
                 },
                 MousePressed(button) => {
                     if button != MouseButton::Left {
@@ -211,10 +215,10 @@ fn process_mouse_events(app: &App, model: &mut Model, event: Event) {
                         model.opts.specular_strengths[obj_idx] = 0.7;
                     } else {
                         model.opts.selected_object_idx = None;
-                        model.opts.specular_strengths = [0.0, 0.0, 0.0, 0.0];
+                        model.opts.specular_strengths = [0.0, 0.0, 0.0, 0.0, 1.0];
                     }
 
-                    dbg!(&model.opts.camera_opts.position);
+                    // dbg!(&model.opts.camera_opts.position);
                 },
                 MouseWheel(scroll_delta, _) => {
                     match scroll_delta {
@@ -311,7 +315,7 @@ fn build_model() -> Model {
         is_mouse_inited: false,
         curr_mouse_x: 0.0,
         curr_mouse_y: 0.0,
-        mouse_sensitivity: 0.0005,
+        mouse_sensitivity: 0.001,
         move_speed: 0.1,
         mouse_is_in_window: false,
         scroll_speed: 0.01,
@@ -349,7 +353,7 @@ fn setup_scene(render_options: &RenderOptions) -> Scene {
     );
 
     let lights = vec![Light {
-        location: &lookat_transform * &Point {x: 0.0, y: 5.0, z: 0.0},
+        location: (&lookat_transform * &render_options.transformations[4].translation).into(),
         color: Color {r: 1.0, g: 1.0, b: 1.0},
     }];
 
@@ -366,15 +370,6 @@ fn setup_scene(render_options: &RenderOptions) -> Scene {
     let sphere_b_transform = &lookat_transform * &render_options.transformations[2];
     let transformed_sphere_b = TransformedSurface::new(sphere_b_transform, sphere_b);
 
-    // let sphere_c = Sphere {
-    //     center: Point {x: -1.0, y: 1.0, z: 0.0},
-    //     radius: 0.25,
-    //     color: Color {r: 1.0, g: 0.0, b: 0.0},
-    //     specular_strength: render_options.specular_strengths[3],
-    // };
-    // let sphere_c_transform = &lookat_transform * &render_options.transformations[3];
-    // let transformed_sphere_c = TransformedSurface::new(sphere_c_transform, sphere_c);
-
     let cone = Cone {
         apex: Point {x: 0.0, y: 0.0, z: 0.0},
         half_angle: 0.5,
@@ -385,12 +380,17 @@ fn setup_scene(render_options: &RenderOptions) -> Scene {
     let cone_transform = &lookat_transform * &render_options.transformations[3];
     let transformed_cone = TransformedSurface::new(cone_transform, cone);
 
+    let light_sphere = Sphere::new(lights[0].color.clone());
+    let light_transform = &lookat_transform * &render_options.transformations[4];
+    let light_transformed = TransformedSurface::new(light_transform, light_sphere);
+
     Scene {
         objects: vec![
             Box::new(transformed_plane),
             Box::new(transformed_sphere_a),
             Box::new(transformed_sphere_b),
             Box::new(transformed_cone),
+            // Box::new(light_transformed),
         ],
         camera: Camera::from_z_position(-1.0, render_options.fov, render_options.projection_type, WIDTH, HEIGHT),
         background_color: Color {r: 0.204, g: 0.596, b: 0.86},
@@ -410,7 +410,7 @@ impl RenderOptions {
             selected_object_idx: None,
             spheres_fly_radius: 3.0,
             spheres_fly_speed: 0.3,
-            specular_strengths: [0.0, 0.0, 0.0, 0.0],
+            specular_strengths: [0.0, 0.0, 0.0, 0.0, 0.0],
             fov: std::f32::consts::PI * 0.5,
             camera_opts: CameraOptions {
                 yaw: -0.5 * std::f32::consts::PI,
@@ -430,6 +430,10 @@ impl RenderOptions {
                 Transformation {
                     transform_mat: &Mat3::identity() * 1.0,
                     translation: Vec3::new(0.0, 0.0, 0.0),
+                },
+                Transformation {
+                    transform_mat: Mat3::identity(),
+                    translation: Vec3::new(0.0, 5.0, 0.0),
                 }
             ],
         }

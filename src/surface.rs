@@ -254,9 +254,9 @@ impl<S: Surface> Surface for TransformedSurface<S> {
             direction: (&self.transformation_inv * &ray.direction).normalize(),
         };
 
-        if debug {
-            dbg!(&ray_os);
-        }
+        // if debug {
+        //     dbg!(&ray_os);
+        // }
 
         if let Some(t) = self.surface.compute_hit(&ray_os, debug) {
             let hit_point = &self.transformation * &ray_os.compute_point(t);
