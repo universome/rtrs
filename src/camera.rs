@@ -29,22 +29,14 @@ pub struct ViewingPlane {
 
 
 impl Camera {
-    pub fn from_z_position(z: f32, projection_type: ProjectionType, width: u32, height: u32) -> Camera {
+    pub fn from_z_position(z: f32, fov: f32, projection_type: ProjectionType, width: u32, height: u32) -> Camera {
         Camera {
             origin: Point {x: 0.0, y: 0.0, z: z},
             direction: Vec3 {x: 0.0, y: 0.0, z: 1.0},
             up: Vec3 {x: 0.0, y: 1.0, z: 0.0},
             right: Vec3 {x: 1.0, y: 0.0, z: 0.0},
             projection_type: projection_type,
-            viewing_plane: ViewingPlane {
-                z: z + 0.5,
-                x_min: -0.1,
-                x_max: 0.1,
-                y_min: -0.075,
-                y_max: 0.075,
-                width: width,
-                height: height,
-            }
+            viewing_plane: ViewingPlane::from_fov(fov, z, width, height),
         }
     }
 
@@ -68,6 +60,21 @@ impl Camera {
 
 
 impl ViewingPlane {
+    pub fn from_fov(fov: f32, z: f32, width: u32, height: u32) -> ViewingPlane {
+        let y_half = (fov * 0.5).tanh();
+        let x_half = y_half * (width as f32) / (height as f32);
+
+        ViewingPlane {
+            z: z + 1.0 / (fov * 0.5).tanh(),
+            x_min: -x_half,
+            x_max: x_half,
+            y_min: -y_half,
+            y_max: y_half,
+            width: width,
+            height: height,
+        }
+    }
+
     pub fn generate_uv_coords(&self, i: u32, j: u32) -> (f32, f32) {
         let x_dist = self.x_max - self.x_min;
         let y_dist = self.y_max - self.y_min;

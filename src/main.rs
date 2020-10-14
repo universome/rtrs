@@ -44,7 +44,7 @@ pub struct Model {
     mouse_sensitivity: f32,
     move_speed: f32,
     mouse_is_in_window: bool,
-    skip_next_mouse_event: bool,
+    scroll_speed: f32,
 }
 
 
@@ -59,6 +59,7 @@ pub struct RenderOptions {
     specular_strengths: [f32; 4],
     spheres_fly_radius: f32,
     spheres_fly_speed: f32,
+    fov: f32,
 }
 
 #[derive(Debug, Clone)]
@@ -97,11 +98,7 @@ fn update_on_event(app: &App, model: &mut Model, event: Event) {
     process_mouse_events(app, model, event);
     process_mouse_move(app, model);
 
-    // println!("Before: {:?}", model.opts.transformations[3].transform_mat);
-    // println!("Rotation: {:?}", Mat3::rotation(0.3, Vec3::new(0.0, 0.0, 1.0)));
-    // model.opts.transformations[3].transform_mat = &(&model.opts.transformations[3].transform_mat * &Mat3::rotation(0.3, Vec3::new(0.0, 0.0, 1.0))) * &Mat3::rotation(0.3, Vec3::new(0.0, 0.0, 1.0));
     model.opts.transformations[3].transform_mat = &model.opts.transformations[3].transform_mat * &Mat3::rotation(0.3, Vec3::new(0.0, 0.0, 1.0));
-    // println!("After: {:?}", model.opts.transformations[3].transform_mat);
 
     model.scene = setup_scene(&model.opts);
 }
@@ -190,9 +187,20 @@ fn process_mouse_events(app: &App, model: &mut Model, event: Event) {
 
                     dbg!(&model.opts.camera_opts.position);
                 },
+                MouseWheel(scroll_delta, _) => {
+                    match scroll_delta {
+                        MouseScrollDelta::PixelDelta(position) => {
+                            model.opts.fov += (position.y as f32) * model.scroll_speed;
+                            model.opts.fov = model.opts.fov
+                                .min(std::f32::consts::PI * 165.0 / 180.0)
+                                .max(std::f32::consts::PI * 15.0 / 180.0);
+                        }
+                        _ => {}
+                    }
+                },
                 _ => {}
             }
-        }
+        },
         _ => {},
     }
 }
@@ -277,7 +285,7 @@ fn build_model() -> Model {
         mouse_sensitivity: 0.0005,
         move_speed: 0.1,
         mouse_is_in_window: false,
-        skip_next_mouse_event: false,
+        scroll_speed: 0.01,
     }
 }
 
@@ -353,7 +361,7 @@ fn setup_scene(render_options: &RenderOptions) -> Scene {
             Box::new(transformed_sphere_b),
             Box::new(transformed_cone),
         ],
-        camera: Camera::from_z_position(-1.0, render_options.projection_type, WIDTH, HEIGHT),
+        camera: Camera::from_z_position(-1.0, render_options.fov, render_options.projection_type, WIDTH, HEIGHT),
         background_color: Color {r: 0.204, g: 0.596, b: 0.86},
         lights: lights,
         ambient_strength: 0.3,
@@ -372,6 +380,7 @@ impl RenderOptions {
             spheres_fly_radius: 3.0,
             spheres_fly_speed: 0.3,
             specular_strengths: [0.0, 0.0, 0.0, 0.0],
+            fov: std::f32::consts::PI * 0.5,
             camera_opts: CameraOptions {
                 yaw: -0.5 * std::f32::consts::PI,
                 pitch: 0.0,
