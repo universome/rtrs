@@ -15,7 +15,7 @@ impl Mat3 {
         ]}
     }
 
-    fn rotation(angle: f32, axis: Vec3) -> Self {
+    pub fn rotation(angle: f32, axis: Vec3) -> Self {
         Mat3 {rows: [
             Vec3::new(
                 (axis.x.powi(2) + (axis.y.powi(2) + axis.z.powi(2)) * angle.cos()) / axis.norm_squared(),
@@ -65,9 +65,9 @@ impl Mat3 {
 
     pub fn transpose(&self) -> Mat3 {
         Mat3 {rows: [
-            Vec3 {x: self[0][0], y: self[1][0], z: self[2][0]},
-            Vec3 {x: self[0][1], y: self[1][1], z: self[2][1]},
-            Vec3 {x: self[0][2], y: self[1][2], z: self[2][2]},
+            Vec3::new(self[0][0], self[1][0], self[2][0]),
+            Vec3::new(self[0][1], self[1][1], self[2][1]),
+            Vec3::new(self[0][2], self[1][2], self[2][2]),
         ]}
     }
 }
@@ -116,11 +116,11 @@ impl ops::Mul<&Mat3> for &Mat3 {
     fn mul(self, other: &Mat3) -> Mat3 {
         let other_t = other.transpose();
 
-        Mat3 {rows: [
+        (Mat3 {rows: [
             self * &other_t.rows[0],
             self * &other_t.rows[1],
             self * &other_t.rows[2],
-        ]}
+        ]}).transpose()
     }
 }
 
@@ -277,8 +277,74 @@ mod tests {
     }
 
     #[test]
+    fn test_transpose() {
+        let mat = Mat3 {rows: [
+            Vec3::new(1.0, 2.0, 3.0),
+            Vec3::new(4.0, 5.0, 6.0),
+            Vec3::new(7.0, 8.0, 9.0),
+        ]};
+        let mat_t = mat.transpose();
+
+        assert_eq!(mat_t[0][0], 1.0);
+        assert_eq!(mat_t[0][1], 4.0);
+        assert_eq!(mat_t[0][2], 7.0);
+        assert_eq!(mat_t[1][0], 2.0);
+        assert_eq!(mat_t[1][1], 5.0);
+        assert_eq!(mat_t[1][2], 8.0);
+        assert_eq!(mat_t[2][0], 3.0);
+        assert_eq!(mat_t[2][1], 6.0);
+        assert_eq!(mat_t[2][2], 9.0);
+    }
+
+    #[test]
+    fn test_mv_product() {
+        let mat = Mat3 {rows: [
+            Vec3::new(1.0, 2.0, 3.0),
+            Vec3::new(4.0, 5.0, 6.0),
+            Vec3::new(7.0, 8.0, 9.0),
+        ]};
+        let vec = Vec3::new(1.0, 2.0, 3.0);
+        let result = &mat * &vec;
+
+        assert_eq!(result[0], 1.0 + 4.0 + 9.0);
+        assert_eq!(result[1], 4.0 + 10.0 + 18.0);
+        assert_eq!(result[2], 7.0 + 16.0 + 27.0);
+    }
+
+    #[test]
+    fn test_mm_product() {
+        let mat = Mat3 {rows: [
+            Vec3::new(1.0, 2.0, 3.0),
+            Vec3::new(4.0, 5.0, 6.0),
+            Vec3::new(7.0, 8.0, 9.0),
+        ]};
+        let identity = Mat3::identity();
+        let left_product = &identity * &mat;
+        let right_product = &mat * &identity;
+
+        for product in vec![left_product, right_product] {
+            assert_eq!(mat[0][0], product[0][0]);
+            assert_eq!(mat[0][1], product[0][1]);
+            assert_eq!(mat[0][2], product[0][2]);
+            assert_eq!(mat[1][0], product[1][0]);
+            assert_eq!(mat[1][1], product[1][1]);
+            assert_eq!(mat[1][2], product[1][2]);
+            assert_eq!(mat[2][0], product[2][0]);
+            assert_eq!(mat[2][1], product[2][1]);
+            assert_eq!(mat[2][2], product[2][2]);
+        }
+    }
+
+    #[test]
     fn test_rotation() {
         let rotation = Mat3::rotation(std::f32::consts::PI * 0.5, Vec3::new(0.0, 1.0, 0.0));
+        let reverse_rotation = Mat3::rotation(-std::f32::consts::PI * 0.5, Vec3::new(0.0, 1.0, 0.0));
+        let rotation_product = &rotation * &reverse_rotation;
+
+        assert!(approx_eq!(f32, rotation_product[0][0], 1.0, epsilon=0.0001));
+        assert!(approx_eq!(f32, rotation_product[1][1], 1.0, epsilon=0.0001));
+        assert!(approx_eq!(f32, rotation_product[2][2], 1.0, epsilon=0.0001));
+
         let point = Point {x: 1.0, y: 0.0, z: 0.0};
         let point_rotated = &rotation * &point;
 

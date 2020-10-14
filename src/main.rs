@@ -81,10 +81,7 @@ fn model(app: &App) -> Model {
         .new_window()
         .title("CS248 Computer Graphics")
         .size(WIDTH, HEIGHT)
-        // .key_pressed(on_key_press)
-        // .event(update_on_event)
         .view(view)
-        // .decorations(false)
         .build()
         .unwrap();
 
@@ -99,7 +96,12 @@ fn update_on_event(app: &App, model: &mut Model, event: Event) {
     process_keys(app, model);
     process_mouse_events(app, model, event);
     process_mouse_move(app, model);
-    // println!("{:?}", model.opts.camera_opts);
+
+    // println!("Before: {:?}", model.opts.transformations[3].transform_mat);
+    // println!("Rotation: {:?}", Mat3::rotation(0.3, Vec3::new(0.0, 0.0, 1.0)));
+    // model.opts.transformations[3].transform_mat = &(&model.opts.transformations[3].transform_mat * &Mat3::rotation(0.3, Vec3::new(0.0, 0.0, 1.0))) * &Mat3::rotation(0.3, Vec3::new(0.0, 0.0, 1.0));
+    model.opts.transformations[3].transform_mat = &model.opts.transformations[3].transform_mat * &Mat3::rotation(0.3, Vec3::new(0.0, 0.0, 1.0));
+    // println!("After: {:?}", model.opts.transformations[3].transform_mat);
 
     model.scene = setup_scene(&model.opts);
 }
@@ -263,6 +265,7 @@ fn view(app: &App, model: &Model, frame: Frame) {
 
 
 fn build_model() -> Model {
+    println!("Building model!");
     let render_options = RenderOptions::defaults();
 
     Model {
@@ -385,7 +388,7 @@ impl RenderOptions {
                     translation: Vec3::new(0.0, 0.0, 0.0),
                 },
                 Transformation {
-                    transform_mat: Mat3::identity(),
+                    transform_mat: &Mat3::identity() * 1.0,
                     translation: Vec3::new(0.0, 0.0, 0.0),
                 }
             ],
