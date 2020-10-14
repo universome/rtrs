@@ -23,6 +23,17 @@ pub struct Sphere {
     pub specular_strength: f32,
 }
 
+impl Sphere {
+    pub fn new() -> Self {
+        Sphere {
+            center: Point {x: 0.0, y: 0.0, z: 0.0},
+            radius: 1.0,
+            color: Color {r: 0.0, g: 0.0, b: 1.0},
+            specular_strength: 0.0,
+        }
+    }
+}
+
 impl Surface for Sphere {
     fn compute_hit(&self, ray: &Ray) -> Option<f32> {
         // debug_assert!(is_unit_length(ray.direction));

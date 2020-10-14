@@ -52,8 +52,8 @@ pub struct RenderOptions {
     camera_options: CameraOptions,
     selected_pixel: Option<(u32, u32)>,
     selected_object_idx: Option<usize>,
-    transformations: [Transformation; 2],
-    specular_strengths: [f32; 2],
+    transformations: [Transformation; 3],
+    specular_strengths: [f32; 3],
 }
 
 #[derive(Debug, Clone)]
@@ -74,22 +74,6 @@ fn model(app: &App) -> Model {
     app.new_window().event(update).size(WIDTH, HEIGHT).view(view).build().unwrap();
 
     build_model()
-}
-
-
-fn build_model() -> Model {
-    let render_options = RenderOptions::defaults();
-
-    Model {
-        opts: render_options,
-        is_mouse_inited: false,
-        curr_mouse_x: 0.0,
-        curr_mouse_y: 0.0,
-        mouse_sensitivity: 0.001,
-        move_speed: 0.5,
-        mouse_is_in_window: false,
-        scene: setup_scene(RenderOptions::defaults())
-    }
 }
 
 
@@ -124,7 +108,7 @@ fn update(_app: &App, model: &mut Model, event: WindowEvent) {
         },
         MouseMoved(point) => {
             if !model.mouse_is_in_window {
-                println!("Mouse is not in window!");
+                println!("Mouse is not in the window!");
                 return;
             }
             if !model.is_mouse_inited {
@@ -155,11 +139,15 @@ fn update(_app: &App, model: &mut Model, event: WindowEvent) {
             model.opts.selected_pixel = None;
         },
         MousePressed(button) => {
-            if button == MouseButton::Left {
-                model.opts.selected_pixel = Some((
-                    (model.curr_mouse_x + (WIDTH as f32) / 2.0) as u32,
-                    (model.curr_mouse_y + (HEIGHT as f32) / 2.0) as u32,
-                ));
+            if button != MouseButton::Left {
+                return;
+            }
+
+            let i = (model.curr_mouse_x + (WIDTH as f32) / 2.0) as u32;
+            let j = (model.curr_mouse_y + (HEIGHT as f32) / 2.0) as u32;
+
+            if let Some(obj_idx) = model.scene.get_object_idx_at_pixel(i, j) {
+                model.opts.specular_strengths[obj_idx] = 0.5;
             }
         },
         _ => (),
@@ -168,6 +156,8 @@ fn update(_app: &App, model: &mut Model, event: WindowEvent) {
     if let Some(idx) = model.opts.selected_object_idx {
         model.opts.specular_strengths[idx] = 1.0;
     }
+
+    model.scene = setup_scene(&model.opts);
 }
 
 
@@ -209,13 +199,29 @@ fn view(app: &App, model: &Model, frame: Frame) {
 }
 
 
+fn build_model() -> Model {
+    let render_options = RenderOptions::defaults();
+
+    Model {
+        scene: setup_scene(&render_options),
+        opts: render_options,
+        is_mouse_inited: false,
+        curr_mouse_x: 0.0,
+        curr_mouse_y: 0.0,
+        mouse_sensitivity: 0.001,
+        move_speed: 0.5,
+        mouse_is_in_window: false,
+    }
+}
+
+
 pub fn render_model(model: &Model) -> DynamicImage {
-    let scene = setup_scene(model.opts.clone());
+    // let scene = setup_scene(&model);
     let pixels = iproduct!(0..HEIGHT, 0..WIDTH)
         .collect::<Vec<(u32, u32)>>()
         .par_iter()
         .map(|p: &(u32, u32)| -> Color {
-            scene.compute_pixel(p.1, HEIGHT - p.0)
+            model.scene.compute_pixel(p.1, HEIGHT - p.0)
         })
         .collect::<Vec<Color>>();
 
@@ -230,7 +236,7 @@ pub fn render_model(model: &Model) -> DynamicImage {
 }
 
 
-fn setup_scene(render_options: RenderOptions) -> Scene {
+fn setup_scene(render_options: &RenderOptions) -> Scene {
     let mut lights = vec![Light {
         location: Point {x: 0.0, y: 5.0, z: 0.0},
         color: Color {r: 1.0, g: 1.0, b: 1.0},
@@ -261,25 +267,22 @@ fn setup_scene(render_options: RenderOptions) -> Scene {
     //     specular_strength: render_options.specular_strength,
     //     scale: DiagMat3 {a: 0.35, b: 0.25, c: 0.25}
     // };
-    let sphere = Sphere {
-        center: Point {x: 0.0, y: 0.0, z: 0.0},
-        radius: 1.0,
-        color: Color {r: 0.0, g: 0.0, b: 1.0},
-        specular_strength: render_options.specular_strengths[0],
-    };
-    let sphere_transform = &lookat_transform * &render_options.transformations[0];
-    let transformed_sphere_a = TransformedSurface::new(sphere_transform, sphere);
-
     let plane = Plane::from_y(-1.4, Color {r: 0.5, g: 0.5, b: 0.5});
-    let transformed_plane = TransformedSurface::new(lookat_transform.clone(), plane);
+    let plane_transform = &lookat_transform * &render_options.transformations[0];
+    let transformed_plane = TransformedSurface::new(plane_transform, plane);
+
+    let mut sphere_a = Sphere::new();
+    sphere_a.specular_strength = render_options.specular_strengths[1];
+    let sphere_a_transform = &lookat_transform * &render_options.transformations[1];
+    let transformed_sphere_a = TransformedSurface::new(sphere_a_transform, sphere_a);
 
     let sphere_b = Sphere {
         center: Point {x: -1.0, y: 1.0, z: 0.0},
         radius: 0.25,
         color: Color {r: 1.0, g: 0.0, b: 0.0},
-        specular_strength: render_options.specular_strengths[1],
+        specular_strength: render_options.specular_strengths[2],
     };
-    let sphere_b_transform = &lookat_transform * &render_options.transformations[1];
+    let sphere_b_transform = &lookat_transform * &render_options.transformations[2];
     let transformed_sphere_b = TransformedSurface::new(sphere_b_transform, sphere_b);
 
     // let cone = Cone {
@@ -294,9 +297,9 @@ fn setup_scene(render_options: RenderOptions) -> Scene {
 
     Scene {
         objects: vec![
+            Box::new(transformed_plane),
             Box::new(transformed_sphere_a),
             Box::new(transformed_sphere_b),
-            Box::new(transformed_plane),
         ],
         camera: Camera::from_z_position(-1.0, render_options.projection_type, WIDTH, HEIGHT),
         background_color: Color {r: 0.204, g: 0.596, b: 0.86},
@@ -331,8 +334,9 @@ impl RenderOptions {
             },
             selected_pixel: None,
             selected_object_idx: None,
-            specular_strengths: [0.0, 0.0],
+            specular_strengths: [0.0, 0.0, 0.0],
             transformations: [
+                Transformation::identity(),
                 Transformation {
                     transform_mat: Mat3 {rows: [
                         Vec3 {x: 0.25, y: 0.0, z: 0.0},

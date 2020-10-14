@@ -42,22 +42,22 @@ pub struct ViewingPlane {
 
 
 impl Scene {
-    // pub fn get_object_at_pixel(&self, i: u32, j: u32) -> Option<(&dyn Surface, f32)> {
-    //     let ray = self.camera.generate_ray(i, j);
-    //     let mut closest_obj = None;
-    //     let mut min_t = f32::INFINITY;
+    pub fn get_object_idx_at_pixel(&self, i: u32, j: u32) -> Option<usize> {
+        let ray = self.camera.generate_ray(i, j);
+        let mut closest_obj_idx = None;
+        let mut min_t = f32::INFINITY;
 
-    //     for object in self.objects.iter() {
-    //         if let Some(t) = object.compute_hit(&ray) {
-    //             if t < min_t {
-    //                 closest_obj = Some((*object, t));
-    //                 min_t = t;
-    //             }
-    //         }
-    //     }
+        for (idx, object) in self.objects.iter().enumerate() {
+            if let Some(t) = object.compute_hit(&ray) {
+                if t < min_t {
+                    closest_obj_idx = Some(idx);
+                    min_t = t;
+                }
+            }
+        }
 
-    //     closest_obj
-    // }
+        closest_obj_idx
+    }
 
     pub fn compute_pixel(&self, i: u32, j: u32) -> Color {
         // let closest_obj = self.get_object_at_pixel(i, j);

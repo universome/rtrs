@@ -7,6 +7,14 @@ pub struct Mat3 {
 }
 
 impl Mat3 {
+    fn identity() -> Self {
+        Mat3 {rows: [
+            Vec3::new(1.0, 0.0, 0.0),
+            Vec3::new(0.0, 1.0, 0.0),
+            Vec3::new(0.0, 0.0, 1.0),
+        ]}
+    }
+
     fn det(&self) -> f32 {
         self[0][0] * (self[1][1] * self[2][2] - self[2][1] * self[1][2]) -
         self[0][1] * (self[1][0] * self[2][2] - self[1][2] * self[2][0]) +
@@ -105,10 +113,17 @@ pub struct Transformation {
 
 
 impl Transformation {
-    pub fn new(&self, transform_mat: Mat3, translation: Vec3) -> Self {
+    pub fn new(transform_mat: Mat3, translation: Vec3) -> Self {
         Transformation {
             transform_mat: transform_mat,
             translation: translation,
+        }
+    }
+
+    pub fn identity() -> Self {
+        Transformation {
+            transform_mat: Mat3::identity(),
+            translation: Vec3::new(0.0, 0.0, 0.0),
         }
     }
 
