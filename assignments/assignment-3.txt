@@ -1,0 +1,37 @@
+Assignment 3: Object-Order Rendering with Rasterization
+
+(Minimal requirements are a guideline for succeeding to obtain 80% points. You are strongly encouraged to engage yourself with the assignment and implement features that are beyond this feature set by at least 20% to score the maximum points. However extra features do not mean that you do not need to implement one or the other minimum requirement aspect, those should be a subset of your assignment solution. On the student presentation, you should highlight the extra 20% of your assignment solution as this will likely differentiate you from the rest of the class.)
+
+The set of tasks will be about an object-order graphics pipeline. Our basic representation will be a triangle mesh, coming with an OBJ file format.
+
+1. First, your task is to load this mesh into an indexed mesh data structure that allows you to easily iterate through the triangles. For loading the mesh from the obj format you can write your own importer or you use for this an existing library. Author of the model is Tayyab Mubeen and is downloadable from: https://grabcad.com/library/kaust-beacon-1. For the purposes of this assignment it has been converted to an OBJ file format using the Meshlab software.
+
+2. If you use the mesh provided in this assignment, it is bounded by a sphere with center point C=[125,125,125] and the radius r = 125. Therefore set the view-model transformation so that the entire object fits into the viewing frustum of the camera.
+
+3. For each triangle you need to calculate a per face normal as a normalized cross product of the three vertex coordinates.
+
+4. Implement Arcball controls either by transforming the camera or the model relative to the object's bounding sphere around the center of the object so that you can see the entire object from all viewpoints (therefore no clipping should be needed to implement).
+
+5. Implement the viewing transformation so that all your triangles will be transformed into the screen space.
+
+6. Perform the rasterization of each triangle using the barycentric coordinates interpolation for each triangle fragment.
+
+7. Implement the z-buffer technique in which only the closest fragment to the camera is stored. Also create and store a normal buffer (a buffer where rgb represent xyz of a normal vector) and store there the per face normal (of course transformed into screen space).
+
+8. Perform Gouraud shading with one light source placed somewhere above the camera using the normal stored in the normal buffer and store the shading result into the color buffer that is displayed on the screen.
+
+Ideas for additional points:
+- Implement a zooming functionality and the necessary triangle clipping.
+- Perform texture parameterization with spherical coordinates and map a texture on this object.
+- Create a 3D marble texture and make the object textured with it.
+- Calculate a procedural displacement technique that will make a wavy effect on the surfaces of the model.
+- Create a wireframe model rendering with a hidden surface removal.
+- Implement Phong shading.
+- Box filtering with superresolution (supersampling?) for antialiasing (with a key control to enable/disable it)
+- Parallelization?
+- Face culling
+- Ticker that shows FPS
+
+Fun assignment: Find out what is written on the bottom of the model. Send me a screenshot to prove that it has been read by using your own renderer.
+
+Hint: Take a look here https://learnopengl.com/Advanced-Lighting/Deferred-Shading for deferred shading and normal buffer example.

@@ -27,12 +27,12 @@ use crate::matrix::{Mat3, Transformation};
 
 // static WIDTH: u32 = 640;
 // static HEIGHT: u32 = 480;
-static WIDTH: u32 = 800;
-static HEIGHT: u32 = 600;
+// static WIDTH: u32 = 800;
+// static HEIGHT: u32 = 600;
 // static WIDTH: u32 = 960;
 // static HEIGHT: u32 = 720;
-// static WIDTH: u32 = 1280;
-// static HEIGHT: u32 = 960;
+static WIDTH: u32 = 1280;
+static HEIGHT: u32 = 960;
 static mut NUM_FRAMES_SINCE_LAST_SEC: u32 = 0;
 static mut LAST_SEC: u32 = 0;
 
@@ -75,7 +75,7 @@ pub struct CameraOptions {
 
 
 fn main() {
-    // rayon::ThreadPoolBuilder::new().num_threads(4).build_global().unwrap();
+    // rayon::ThreadPoolBuilder::new().num_threads(8).build_global().unwrap();
     rayon::ThreadPoolBuilder::new().num_threads(16).build_global().unwrap();
 
     nannou::app(model).event(update_on_event).run();
@@ -95,14 +95,10 @@ fn model(app: &App) -> Model {
 
 
 fn update_on_event(app: &App, model: &mut Model, event: Event) {
-    // (*_app.main_window()).set_cursor_grab(true);
-
     model.opts.update_transformations_on_time(app.time);
     process_keys(app, model);
     process_mouse_events(app, model, event);
     process_mouse_move(app, model);
-
-    // model.opts.transformations[3].transform_mat = &model.opts.transformations[3].transform_mat * &Mat3::rotation(0.3, Vec3::new(0.0, 0.0, 1.0));
 
     model.scene = setup_scene(&model.opts);
 }
@@ -392,7 +388,6 @@ fn setup_scene(render_options: &RenderOptions) -> Scene {
             Box::new(transformed_sphere_a),
             Box::new(transformed_sphere_b),
             Box::new(transformed_cone),
-            // Box::new(light_transformed),
         ],
         camera: Camera::from_z_position(-1.0, render_options.fov, render_options.projection_type, WIDTH, HEIGHT),
         background_color: Color {r: 0.204, g: 0.596, b: 0.86},

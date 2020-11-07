@@ -56,7 +56,6 @@ impl Scene {
         let (obj, min_t_ws) = closest_obj.unwrap();
         let mut color = &obj.get_color() * self.ambient_strength;
         let hit_point_ws = ray_ws.compute_point(min_t_ws); // TODO: do not recompute the hit hit_point
-
         let normal_ws = obj.compute_normal(&hit_point_ws);
 
         for light_ws in self.lights.iter() {

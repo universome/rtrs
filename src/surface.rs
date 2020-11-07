@@ -221,18 +221,6 @@ pub struct TransformedSurface<S> where S: Surface {
 }
 
 
-// impl<S: Surface> TransformedSurface<S> {
-//     pub fn new<T: Surface>(transformation: Transformation, surface: T) -> TransformedSurface<T> {
-//         let transformation_inv = transformation.compute_inverse();
-
-//         TransformedSurface {
-//             transformation: transformation,
-//             transform_inv_t: transformation_inv.transform_mat.transpose(),
-//             transformation_inv: transformation_inv,
-//             surface: surface,
-//         }
-//     }
-// }
 impl<S: Surface> TransformedSurface<S> {
     pub fn new(transformation: Transformation, surface: S) -> TransformedSurface<S> {
         let transformation_inv = transformation.compute_inverse();
@@ -253,10 +241,6 @@ impl<S: Surface> Surface for TransformedSurface<S> {
             origin: &self.transformation_inv * &ray.origin,
             direction: (&self.transformation_inv * &ray.direction).normalize(),
         };
-
-        // if debug {
-        //     dbg!(&ray_os);
-        // }
 
         if let Some(t) = self.surface.compute_hit(&ray_os, debug) {
             let hit_point = &self.transformation * &ray_os.compute_point(t);
