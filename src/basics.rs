@@ -3,7 +3,7 @@ use nannou::image::{Rgb};
 use derive_more;
 
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct Color {
     pub r: f32,
     pub g: f32,
@@ -11,6 +11,10 @@ pub struct Color {
 }
 
 impl Color {
+    pub fn new(r: f32, g: f32, b: f32) -> Color {
+        (&Color {r: r, g: g, b: b}).clamp()
+    }
+
     pub fn clamp(&self) -> Color {
         Color {
             r: self.r.max(0.0).min(1.0),

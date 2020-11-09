@@ -1,7 +1,7 @@
 use std::marker::Sync;
 use std::fmt::Debug;
 use crate::basics::*;
-use crate::matrix::{Mat3, Transformation};
+use crate::matrix::{Mat3, AffineMat3};
 
 
 static MIN_RAY_T: f32 = 0.0001;
@@ -214,15 +214,15 @@ impl Surface for Cone {
 
 #[derive(Debug, Clone)]
 pub struct TransformedSurface<S> where S: Surface {
-    transformation: Transformation,
-    transformation_inv: Transformation,
+    transformation: AffineMat3,
+    transformation_inv: AffineMat3,
     transform_inv_t: Mat3,
     surface: S,
 }
 
 
 impl<S: Surface> TransformedSurface<S> {
-    pub fn new(transformation: Transformation, surface: S) -> TransformedSurface<S> {
+    pub fn new(transformation: AffineMat3, surface: S) -> TransformedSurface<S> {
         let transformation_inv = transformation.compute_inverse();
 
         TransformedSurface {

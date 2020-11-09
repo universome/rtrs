@@ -5,20 +5,23 @@ extern crate derive_more;
 extern crate itertools;
 #[macro_use]
 extern crate float_cmp;
+#[macro_use]
+extern crate nalgebra;
 
-use rayon::prelude::*;
-
-mod scene;
-mod camera;
+// mod scene;
+// mod camera;
 mod basics;
-mod surface;
+// mod surface;
 mod matrix;
-mod ray_tracer;
+// mod ray_tracer;
+mod rasterizer;
+mod mesh;
+mod cow;
 
 
 fn main() {
     // rayon::ThreadPoolBuilder::new().num_threads(8).build_global().unwrap();
     rayon::ThreadPoolBuilder::new().num_threads(16).build_global().unwrap();
 
-    ray_tracer::launch();
+    rasterizer::launch();
 }

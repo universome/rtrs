@@ -1,9 +1,6 @@
-use std::ptr;
-
 use crate::camera::{Camera};
 use crate::surface::{Surface};
 use crate::basics::*;
-use crate::matrix::{Mat3};
 
 
 pub struct Scene {
@@ -34,14 +31,14 @@ impl Scene {
         closest_obj_idx
     }
 
-    pub fn compute_pixel(&self, i: u32, j: u32, debug: bool) -> Color {
+    pub fn compute_pixel(&self, i: u32, j: u32, _debug: bool) -> Color {
         // let closest_obj = self.get_object_at_pixel(i, j);
         let ray_ws = self.camera.generate_ray(i, j);
         let mut closest_obj = None;
         let mut min_t_ws = f32::INFINITY;
 
         for object in self.objects.iter() {
-            if let Some(t_ws) = object.compute_hit(&ray_ws, debug) {
+            if let Some(t_ws) = object.compute_hit(&ray_ws, _debug) {
                 if t_ws < min_t_ws {
                     closest_obj = Some((object, t_ws));
                     min_t_ws = t_ws;
@@ -68,7 +65,7 @@ impl Scene {
 
             if self.objects.iter()
                 // .filter(|o| !ptr::eq(*o, &*obj)) TODO: why did we need this?
-                .any(|o| o.compute_hit(&shadow_ray, debug).filter(|t| t <= &distance_to_light).is_some()) {
+                .any(|o| o.compute_hit(&shadow_ray, _debug).filter(|t| t <= &distance_to_light).is_some()) {
                     continue;
             }
 

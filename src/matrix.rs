@@ -145,36 +145,66 @@ impl ops::Mul<f32> for &Mat3 {
     }
 }
 
+// #[derive(Debug, Clone)]
+// pub struct Mat4 {
+//     pub rows: [Vec4; 4],
+// }
+
+// impl Mat4 {
+//     pub fn identity() -> Self {
+//         Mat3 {rows: [
+//             Vec3::new(1.0, 0.0, 0.0),
+//             Vec3::new(0.0, 1.0, 0.0),
+//             Vec3::new(0.0, 0.0, 1.0),
+//         ]}
+//     }
+
+//     pub fn from_mat3(mat3: &Mat3) -> Self {
+//         Mat4 {rows: [
+//             Vec4::new()
+//         ]}
+//     }
+
+//     pub fn new_scaling(scales: Vec3) -> Self {
+//         Mat3 {rows: [
+//             Vec4::new(scales[0], 0.0, 0.0, 0.0),
+//             Vec4::new(0.0, scales[1], 0.0, 0.0),
+//             Vec4::new(0.0, 0.0, scales[2], 0.0),
+//             Vec4::new(0.0, 0.0, 0.0, 1.0),
+//         ]}
+//     }
+// }
+
 
 #[derive(Debug, Clone)]
-pub struct Transformation {
+pub struct AffineMat3 {
     pub transform_mat: Mat3,
     pub translation: Vec3,
 }
 
 
-impl Transformation {
+impl AffineMat3 {
     pub fn new(transform_mat: Mat3, translation: Vec3) -> Self {
-        Transformation {
+        AffineMat3 {
             transform_mat: transform_mat,
             translation: translation,
         }
     }
 
     pub fn translation(translation: Vec3) -> Self {
-        Transformation::new(Mat3::identity(), translation)
+        AffineMat3::new(Mat3::identity(), translation)
     }
 
     pub fn rotation(angle: f32, axis: Vec3) -> Self {
-        Transformation::new(Mat3::rotation(angle, axis), Vec3::zero())
+        AffineMat3::new(Mat3::rotation(angle, axis), Vec3::zero())
     }
 
     pub fn scale(scales: Vec3) -> Self {
-        Transformation::new(Mat3::scale(scales), Vec3::zero())
+        AffineMat3::new(Mat3::scale(scales), Vec3::zero())
     }
 
     pub fn identity() -> Self {
-        Transformation {
+        AffineMat3 {
             transform_mat: Mat3::identity(),
             translation: Vec3::new(0.0, 0.0, 0.0),
         }
@@ -191,7 +221,7 @@ impl Transformation {
         let up = direction.cross_product(&right).normalize();
         let rotation_inv = Mat3 {rows: [right, up, direction]};
 
-        Transformation {
+        AffineMat3 {
             translation: &rotation_inv * &(position * -1.0),
             transform_mat: rotation_inv,
         }
@@ -201,7 +231,7 @@ impl Transformation {
         let transform_inv = self.transform_mat.compute_inverse();
         let back_translation = &(&transform_inv * &self.translation) * -1.0;
 
-        Transformation {
+        AffineMat3 {
             transform_mat: transform_inv,
             translation: back_translation,
         }
@@ -209,11 +239,11 @@ impl Transformation {
 }
 
 
-impl ops::Mul<&Transformation> for &Transformation {
-    type Output = Transformation;
+impl ops::Mul<&AffineMat3> for &AffineMat3 {
+    type Output = AffineMat3;
 
-    fn mul(self, other: &Transformation) -> Transformation {
-        Transformation {
+    fn mul(self, other: &AffineMat3) -> AffineMat3 {
+        AffineMat3 {
             transform_mat: &self.transform_mat * &other.transform_mat.transpose(),
             translation: &(&self.transform_mat * &other.translation) + &self.translation,
         }
@@ -222,7 +252,7 @@ impl ops::Mul<&Transformation> for &Transformation {
 
 
 
-impl ops::Mul<&Vec3> for &Transformation {
+impl ops::Mul<&Vec3> for &AffineMat3 {
     type Output = Vec3;
 
     fn mul(self, vec: &Vec3) -> Vec3 {
@@ -231,7 +261,7 @@ impl ops::Mul<&Vec3> for &Transformation {
 }
 
 
-impl ops::Mul<&Point> for &Transformation {
+impl ops::Mul<&Point> for &AffineMat3 {
     type Output = Point;
 
     fn mul(self, point: &Point) -> Point {
@@ -287,7 +317,7 @@ mod tests {
 
     #[test]
     fn test_transformation() {
-        let transformation = Transformation::identity();
+        let transformation = AffineMat3::identity();
         let point = Point { x: 1.0, y: 1.0, z: 1.0 };
         let point_transformed = &transformation * &point;
 

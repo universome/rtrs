@@ -8,7 +8,7 @@ use crate::scene::Scene;
 use crate::camera::{Camera, ProjectionType};
 use crate::surface::{TransformedSurface, Sphere, Plane, Cone};
 use crate::basics::*;
-use crate::matrix::{Mat3, Transformation};
+use crate::matrix::{Mat3, AffineMat3};
 
 // static WIDTH: u32 = 640;
 // static HEIGHT: u32 = 480;
@@ -44,7 +44,7 @@ pub struct RenderOptions {
     camera_opts: CameraOptions,
     selected_pixel: Option<(u32, u32)>,
     selected_object_idx: Option<usize>,
-    transformations: [Transformation; 5],
+    transformations: [AffineMat3; 5],
     specular_strengths: [f32; 5],
     spheres_fly_radius: f32,
     spheres_fly_speed: f32,
@@ -88,7 +88,7 @@ fn update_on_event(app: &App, model: &mut Model, event: Event) {
 
 
 fn process_keys(app: &App, model: &mut Model) {
-    let camera_transformation = Transformation::create_look_at(
+    let camera_transformation = AffineMat3::create_look_at(
         &model.opts.camera_opts.position,
         model.opts.camera_opts.yaw,
         model.opts.camera_opts.pitch,
@@ -119,36 +119,36 @@ fn process_keys(app: &App, model: &mut Model) {
 
         if app.keys.down.contains(&Key::Key1) {
             if app.keys.down.contains(&Key::Up) {
-                transformation = Some(Transformation::scale(Vec3::new(1.0 + model.scale_speed, 1.0, 1.0)));
+                transformation = Some(AffineMat3::scale(Vec3::new(1.0 + model.scale_speed, 1.0, 1.0)));
             } else if app.keys.down.contains(&Key::Down) {
-                transformation = Some(Transformation::scale(Vec3::new(1.0 - model.scale_speed, 1.0, 1.0)));
+                transformation = Some(AffineMat3::scale(Vec3::new(1.0 - model.scale_speed, 1.0, 1.0)));
             }
         } else if app.keys.down.contains(&Key::Key2) {
             if app.keys.down.contains(&Key::Up) {
-                transformation = Some(Transformation::scale(Vec3::new(1.0, 1.0 + model.scale_speed, 1.0)));
+                transformation = Some(AffineMat3::scale(Vec3::new(1.0, 1.0 + model.scale_speed, 1.0)));
             } else if app.keys.down.contains(&Key::Down) {
-                transformation = Some(Transformation::scale(Vec3::new(1.0, 1.0 - model.scale_speed, 1.0)));
+                transformation = Some(AffineMat3::scale(Vec3::new(1.0, 1.0 - model.scale_speed, 1.0)));
             }
         } else if app.keys.down.contains(&Key::Key3) {
             if app.keys.down.contains(&Key::Up) {
-                transformation = Some(Transformation::scale(Vec3::new(1.0, 1.0, 1.0 + model.scale_speed)));
+                transformation = Some(AffineMat3::scale(Vec3::new(1.0, 1.0, 1.0 + model.scale_speed)));
             } else if app.keys.down.contains(&Key::Down) {
-                transformation = Some(Transformation::scale(Vec3::new(1.0, 1.0, 1.0 - model.scale_speed)));
+                transformation = Some(AffineMat3::scale(Vec3::new(1.0, 1.0, 1.0 - model.scale_speed)));
             }
         } else if app.keys.down.contains(&Key::Up) {
-            transformation = Some(Transformation::translation(&camera_transformation.transform_mat[1] * model.move_speed));
+            transformation = Some(AffineMat3::translation(&camera_transformation.transform_mat[1] * model.move_speed));
         } else if app.keys.down.contains(&Key::Down) {
-            transformation = Some(Transformation::translation(&camera_transformation.transform_mat[1] * -model.move_speed));
+            transformation = Some(AffineMat3::translation(&camera_transformation.transform_mat[1] * -model.move_speed));
         } else if app.keys.down.contains(&Key::Right) {
-            transformation = Some(Transformation::translation(&camera_transformation.transform_mat[0] * model.move_speed));
+            transformation = Some(AffineMat3::translation(&camera_transformation.transform_mat[0] * model.move_speed));
         } else if app.keys.down.contains(&Key::Left) {
-            transformation = Some(Transformation::translation(&camera_transformation.transform_mat[0] * -model.move_speed));
+            transformation = Some(AffineMat3::translation(&camera_transformation.transform_mat[0] * -model.move_speed));
         } else if app.keys.down.contains(&Key::I) {
-            transformation = Some(Transformation::rotation(model.rotation_speed, Vec3::new(1.0, 0.0, 0.0)));
+            transformation = Some(AffineMat3::rotation(model.rotation_speed, Vec3::new(1.0, 0.0, 0.0)));
         } else if app.keys.down.contains(&Key::O) {
-            transformation = Some(Transformation::rotation(model.rotation_speed, Vec3::new(0.0, 1.0, 0.0)));
+            transformation = Some(AffineMat3::rotation(model.rotation_speed, Vec3::new(0.0, 1.0, 0.0)));
         } else if app.keys.down.contains(&Key::P) {
-            transformation = Some(Transformation::rotation(model.rotation_speed, Vec3::new(0.0, 0.0, 1.0)));
+            transformation = Some(AffineMat3::rotation(model.rotation_speed, Vec3::new(0.0, 0.0, 1.0)));
         }
 
         if let Some(T) = transformation {
@@ -327,7 +327,7 @@ pub fn render_model(model: &Model) -> DynamicImage {
 
 
 fn setup_scene(render_options: &RenderOptions) -> Scene {
-    let lookat_transform = Transformation::create_look_at(
+    let lookat_transform = AffineMat3::create_look_at(
         &render_options.camera_opts.position,
         render_options.camera_opts.yaw,
         render_options.camera_opts.pitch,
@@ -398,20 +398,20 @@ impl RenderOptions {
                 position: Vec3 {x: 0.0, y: 0.0, z: -5.0},
             },
             transformations: [
-                Transformation::identity(),
-                Transformation {
+                AffineMat3::identity(),
+                AffineMat3 {
                     transform_mat: &Mat3::identity() * 0.25,
                     translation: Vec3::new(0.0, 0.0, 0.0),
                 },
-                Transformation {
+                AffineMat3 {
                     transform_mat: &Mat3::identity() * 0.25,
                     translation: Vec3::new(0.0, 0.0, 0.0),
                 },
-                Transformation {
+                AffineMat3 {
                     transform_mat: &Mat3::identity() * 1.0,
                     translation: Vec3::new(0.0, 0.0, 0.0),
                 },
-                Transformation {
+                AffineMat3 {
                     transform_mat: Mat3::identity(),
                     translation: Vec3::new(0.0, 5.0, 0.0),
                 }
