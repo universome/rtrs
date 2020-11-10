@@ -1,4 +1,5 @@
 use std::cmp;
+use std::f32::consts::{PI};
 use nalgebra::{Matrix4, Point3, Vector3};
 use nannou::image::{DynamicImage, RgbImage};
 
@@ -8,37 +9,39 @@ use crate::basics::*;
 
 use crate::cow::{nvertices, stindices, vertices, st};
 
+const inch_to_mm: f32 = 25.4;
 
-// fn compute_screen_coordinates(
-//     filmApertureWidth: f32, filmApertureHeight: f32,
-//     image_width: u32, image_height: u32, near_clipping_plane: f32, focal_length: f32) -> (f32, f32, f32, f32) {
 
-//     let filmAspectRatio = filmApertureWidth / filmApertureHeight;
-//     let deviceAspectRatio = image_width as f32 / image_height as f32;
+fn compute_screen_coordinates(
+    film_aperture_width: f32, film_aperture_height: f32,
+    image_width: usize, image_height: usize, near_clipping_plane: f32, focal_len: f32) -> (f32, f32, f32, f32) {
 
-//     let top = ((filmApertureHeight * inchToMm / 2) / focalLength) * nearClippingPLane;
-//     let right = ((filmApertureWidth * inchToMm / 2) / focalLength) * nearClippingPLane;
+    let film_aspect_ratio = film_aperture_width / film_aperture_height;
+    let device_aspect_ratio = image_width as f32 / image_height as f32;
 
-//     // field of view (horizontal)
-//     float fov = 2 * 180 / M_PI * atan((filmApertureWidth * inchToMm / 2) / focalLength);
-//     std::cerr << "Field of view " << fov << std::endl;
+    let mut top = ((film_aperture_height * inch_to_mm / 2.0) / focal_len) * near_clipping_plane;
+    let mut right = ((film_aperture_width * inch_to_mm / 2.0) / focal_len) * near_clipping_plane;
 
-//     float xscale = 1;
-//     float yscale = 1;
+    // field of view (horizontal)
+    let fov = 2.0 * 180.0 / PI * ((film_aperture_width * inch_to_mm / 2.0) / focal_len).atan();
 
-//     if (filmAspectRatio > deviceAspectRatio) {
-//         yscale = filmAspectRatio / deviceAspectRatio;
-//     }
-//     else {
-//         xscale = deviceAspectRatio / filmAspectRatio;
-//     }
+    let mut xscale = 1.0;
+    let mut yscale = 1.0;
 
-//     right *= xscale;
-//     top *= yscale;
+    if (film_aspect_ratio > device_aspect_ratio) {
+        yscale = film_aspect_ratio / device_aspect_ratio;
+    } else {
+        xscale = device_aspect_ratio / film_aspect_ratio;
+    }
 
-//     bottom = -top;
-//     left = -right;
-// }
+    right *= xscale;
+    top *= yscale;
+
+    let bottom = -top;
+    let left = -right;
+
+    (top, bottom, left, right)
+}
 
 
 pub fn convert_to_raster(
@@ -68,21 +71,10 @@ pub fn launch() {
     let num_triangles = 3156;
     let near_clipping_plane = 1.0;
     let far_clipping_plane = 1000.0;
-    let focal_length = 20.0; // in mm
-    let filmApertureWidth = 0.980; // 35mm Full Aperture in inches
-    let filmApertureHeight = 0.735;
-    // let world_to_camera = Matrix4::new(
-    //     0.707107, -0.331295, 0.624695, 0.0,
-    //     0.0, 0.883452, 0.468521, 0.0,
-    //     -0.707107, -0.331295, 0.624695, 0.0,
-    //     -1.63871, -5.747777, -40.400412, 1.0
-    // );
-    // let world_to_camera = Matrix4::new(
-    //     0.707107, -0.331295, 0.624695, -1.63871,
-    //     0.0, 0.883452, 0.468521, -5.747777,
-    //     -0.707107, -0.331295, 0.624695, -40.400412,
-    //     0.0, 0.0, 0.0, 1.0
-    // );
+    let focal_len = 20.0; // in mm
+    let film_aperture_width = 0.980; // 35mm Full Aperture in inches
+    let film_aperture_width = 0.735;
+
     let world_to_camera = Matrix4::new(
         0.707107, 0.0, -0.707107, -1.63871,
         -0.331295, 0.883452, -0.331295, -5.747777,
@@ -92,12 +84,12 @@ pub fn launch() {
     let image_width: usize = 1280;
     let image_height: usize = 960;
 
-    // let (t, b, l, r) = compute_screen_coordinates(
-    //     filmApertureWidth, filmApertureHeight,
-    //     image_width, image_height,
-    //     near_clipping_plane,
-    //     focal_length);
-    let (t, b, l, r) = (0.466725, -0.466725, -0.622300, 0.622300);
+    let (t, b, l, r) = compute_screen_coordinates(
+        film_aperture_width, film_aperture_width,
+        image_width, image_height,
+        near_clipping_plane,
+        focal_len);
+    // let (t, b, l, r) = (0.466725, -0.466725, -0.622300, 0.622300);
 
     // Vec3<unsigned char> *frameBuffer = new Vec3<unsigned char>[image_width * image_height];
     // let mut frame_buffer = [Color::new(0.0, 0.0, 0.0); (image_width * image_height) as usize];
@@ -120,11 +112,6 @@ pub fn launch() {
         let mut v0_raster = convert_to_raster(&v0, &world_to_camera, l, r, t, b, near_clipping_plane, image_width, image_height);
         let mut v1_raster = convert_to_raster(&v1, &world_to_camera, l, r, t, b, near_clipping_plane, image_width, image_height);
         let mut v2_raster = convert_to_raster(&v2, &world_to_camera, l, r, t, b, near_clipping_plane, image_width, image_height);
-
-        // println!("{}", v0_raster);
-        // println!("{}", v1_raster);
-        // println!("{}", v2_raster);
-        // panic!("stop");
 
         // Precompute reciprocal of vertex z-coordinate
         v0_raster[2] = 1.0 / v0_raster[2];
@@ -149,10 +136,6 @@ pub fn launch() {
         let x_max = max_of_three(v0_raster[0], v1_raster[0], v2_raster[0]);
         let y_max = max_of_three(v0_raster[1], v1_raster[1], v2_raster[1]);
 
-        if (i == 0) {
-            println!("Bounds: {}, {}, {}, {}", x_min, x_max, y_min, y_max);
-        }
-
         // the triangle is out of screen
         if (x_min > (image_width - 1) as f32 || x_max < 0.0 || y_min > (image_height - 1) as f32 || y_max < 0.0) {
             continue;
@@ -165,11 +148,6 @@ pub fn launch() {
         let y1 = cmp::min(image_height as i32 - 1, (y_max.floor() as i32)) as usize;
 
         let area = edge_function(&v0_raster, &v1_raster, &v2_raster);
-
-        if (i == 0) {
-            println!("Refined bounds: {}, {}, {}, {}", x0, x1, y0, y1);
-            println!("Area: {}", area);
-        }
 
         for y in y0..(y1 + 1) {
             for x in x0..(x1 + 1) {
@@ -199,6 +177,8 @@ pub fn launch() {
                             (st0.1 * w0 + st1.1 * w1 + st2.1 * w2) * z
                         );
 
+                        // println!("Tex: {}, {}", tex_coords.0, tex_coords.1);
+
                         // If you need to compute the actual position of the shaded
                         // point in camera space. Proceed like with the other vertex attribute.
                         // Divide the point coordinates by the vertex z-coordinate then
@@ -222,7 +202,7 @@ pub fn launch() {
                         // The final color is the reuslt of the faction ration multiplied by the
                         // checkerboard pattern.
                         let M = 10.0;
-                        let checker = (((tex_coords.0 * M) % 1.0) > 0.5) && (((tex_coords.1 * M) % 1.0) < 0.5);
+                        let checker = (((tex_coords.0 * M) % 1.0) > 0.5) ^ (((tex_coords.1 * M) % 1.0) < 0.5);
                         let c = if checker { 0.7 } else { 0.3 };
                         n_dot_view *= c;
                         frame_buffer[y * image_width + x].r = n_dot_view;
@@ -233,8 +213,6 @@ pub fn launch() {
             }
         }
     }
-
-    println!("Counter: {}", counter);
 
     let mut img = RgbImage::new(image_width as u32, image_height as u32);
     for y in 0..image_height {
