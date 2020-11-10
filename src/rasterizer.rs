@@ -3,7 +3,7 @@ use std::cmp;
 use std::f32::consts::{PI};
 use std::env;
 
-use nalgebra::{Matrix4, Point3, Vector3};
+use nalgebra::{Matrix4, Matrix3, Point3, Vector3};
 use nannou::prelude::*;
 use nannou::image::{DynamicImage, RgbImage};
 use tobj::{Model};
@@ -13,11 +13,17 @@ use crate::matrix::*;
 use crate::basics::*;
 
 const inch_to_mm: f32 = 25.4;
-const WIDTH: u32 = 640;
-const HEIGHT: u32 = 640;
+// const WIDTH: usize = 160;
+// const HEIGHT: usize = 120;
+const WIDTH: usize = 640;
+const HEIGHT: usize = 480;
 
-pub struct State {
+struct State {
     model: Model,
+    camera: Camera,
+    curr_mouse_x: f32,
+    curr_mouse_y: f32,
+    object_to_world: Matrix4<f32>,
     // is_mouse_inited: bool,
     // curr_mouse_x: f32,
     // curr_mouse_y: f32,
@@ -27,6 +33,37 @@ pub struct State {
     // scroll_speed: f32,
     // rotation_speed: f32,
     // scale_speed: f32,
+}
+
+struct Camera {
+    pub distance: f32, // Determines the ball radius for arcball
+    pub eye: Point3<f32>,
+    pub look_at: Point3<f32>,
+    pub up: Vector3<f32>,
+}
+
+
+impl Camera {
+    fn compute_view_matrix(&self) -> Matrix4<f32> {
+        Matrix4::look_at_rh(&self.eye, &self.look_at, &self.up)
+    }
+
+    fn compute_arcball_vector_for_xy(x: f32, y: f32) -> Vector3<f32> {
+        // Computing x, y, in [-1, 1] coords
+        let mut result = Vector3::new(x / WIDTH as f32, y / HEIGHT as f32, 0.0);
+        // result[1] = -result[1];
+
+        // Normalizing
+        let curr_norm_squared = result[0] * result[0] + result[1] * result[1];
+
+        if (curr_norm_squared < 1.0) {
+            result.z = (1.0 - curr_norm_squared).sqrt();
+        } else {
+            result.normalize_mut();
+        }
+
+        result
+    }
 }
 
 
@@ -62,11 +99,11 @@ fn compute_screen_coordinates(
 }
 
 
-pub fn convert_to_raster(
-    vertex: &Point3<f32>, world_to_camera: &Matrix4<f32>, l: f32, r: f32, t: f32, b: f32,
+fn convert_to_raster(
+    vertex: &Point3<f32>, object_to_camera: &Matrix4<f32>, l: f32, r: f32, t: f32, b: f32,
     near: f32, image_width: usize, image_height: usize) -> Point3<f32> {
 
-    let mut result = world_to_camera.transform_point(vertex);
+    let mut result = object_to_camera.transform_point(vertex);
 
     // convert to screen space
     result[0] = near * result[0] / -result[2];
@@ -77,21 +114,46 @@ pub fn convert_to_raster(
     result[1] = 2.0 * result[1] / (t - b) - (t + b) / (t - b);
 
     // convert to raster space
-    result[0] = (result[0] + 1.0) / 2.0 * (image_width as f32);
-    result[1] = (1.0 - result[1]) / 2.0 * (image_height as f32); // in raster space y is down so invert direction
+    result[0] = (result[0] + 1.0) * 0.5 * (image_width as f32);
+    result[1] = (1.0 - result[1]) * 0.5 * (image_height as f32); // in raster space y is down so invert direction
     result[2] = -result[2];
 
     return result
 }
 
 
-pub fn launch(model: Model) {
+pub fn launch() {
     nannou::app(init_app).event(update_on_event).run();
 }
 
 
 fn update_on_event(app: &App, state: &mut State, event: Event) {
-    // pass
+    if (state.curr_mouse_x == app.mouse.x && state.curr_mouse_y == app.mouse.y) {
+        println!("Mouse is not updated...");
+        return;
+    }
+    println!("Mouse pos: {} {} {} {}", state.curr_mouse_x, state.curr_mouse_y, app.mouse.x, app.mouse.y);
+    let prev_arcball_vec = Camera::compute_arcball_vector_for_xy(state.curr_mouse_x, state.curr_mouse_y);
+    let curr_arcball_vec = Camera::compute_arcball_vector_for_xy(app.mouse.x, app.mouse.y);
+    let angle = prev_arcball_vec.dot(&curr_arcball_vec).min(1.0).acos();
+    let world_to_camera = state.camera.compute_view_matrix();
+    let object_to_camera = state.object_to_world * &world_to_camera;
+    let camera_to_object = object_to_camera.try_inverse().unwrap();
+    let axis_camera = prev_arcball_vec.cross(&curr_arcball_vec);
+    let axis_camera = curr_arcball_vec.cross(&prev_arcball_vec);
+    let axis_obj = camera_to_object.transform_vector(&axis_camera).normalize();
+    let rotation = Matrix4::new_rotation_wrt_point(&axis_obj * angle, Point3::new(0.0, 0.0, 0.0));
+
+    println!("prev_arcball_vec: {}", prev_arcball_vec);
+    println!("curr_arcball_vec: {}", curr_arcball_vec);
+    println!("axis_camera: {}", axis_camera);
+    println!("axis_obj: {}", axis_obj);
+    println!("angle: {}", angle);
+    println!("rotation: {}", rotation);
+
+    state.object_to_world = rotation * &state.object_to_world;
+    state.curr_mouse_x = app.mouse.x;
+    state.curr_mouse_y = app.mouse.y;
 }
 
 
@@ -105,12 +167,22 @@ fn init_app(app: &App) -> State {
     app
         .new_window()
         .title("CS248 Computer Graphics")
-        .size(WIDTH, HEIGHT)
+        .size(WIDTH as u32, HEIGHT as u32)
         .view(render_and_display)
         .build()
         .unwrap();
 
-    init_state(models[0].clone())
+    let mut state = init_state(models[0].clone());
+
+    println!("Mouse pos before: {} {} {} {}", state.curr_mouse_x, state.curr_mouse_y, app.mouse.x, app.mouse.y);
+
+    (*app.main_window()).set_cursor_position_points(WIDTH as f32 / 2.0, HEIGHT as f32 / 2.0);
+    state.curr_mouse_x = app.mouse.x;
+    state.curr_mouse_y = app.mouse.y;
+
+    println!("Mouse pos after: {} {} {} {}", state.curr_mouse_x, state.curr_mouse_y, app.mouse.x, app.mouse.y);
+
+    state
 }
 
 
@@ -126,7 +198,7 @@ fn render_and_display(app: &App, state: &State, frame: Frame) {
 }
 
 
-pub fn render_state(state: &State) -> DynamicImage{
+fn render_state(state: &State) -> DynamicImage{
     let model = &state.model;
     let num_triangles = model.mesh.num_face_indices.len();
     let tex = &model.mesh.texcoords;
@@ -142,16 +214,19 @@ pub fn render_state(state: &State) -> DynamicImage{
     //     0.624695, 0.468521, 0.624695, -40.400412,
     //     0.0, 0.0, 0.0, 1.0
     // );
-    let world_to_camera = Matrix4::new(
-        1.0, 0.0, 0.0, 0.0,
-        0.0, 1.0, 0.0, 0.0,
-        0.0, 0.0, 1.0, -40.400412,
-        0.0, 0.0, 0.0, 1.0
-    );
+    // let world_to_camera = Matrix4::new(
+    //     1.0, 0.0, 0.0, 0.0,
+    //     0.0, 1.0, 0.0, 0.0,
+    //     0.0, 0.0, 1.0, -40.400412,
+    //     0.0, 0.0, 0.0, 1.0
+    // );
+    let world_to_camera = state.camera.compute_view_matrix();
+    let object_to_camera = state.object_to_world * &world_to_camera;
+    let camera_to_object = object_to_camera.try_inverse().unwrap();
     // let image_width: usize = 1280;
     // let image_height: usize = 960;
-    let image_width: usize = 640;
-    let image_height: usize = 480;
+    let image_width: usize = WIDTH;
+    let image_height: usize = HEIGHT;
 
     let (t, b, l, r) = compute_screen_coordinates(
         film_aperture_width, film_aperture_width, image_width,
@@ -183,9 +258,9 @@ pub fn render_state(state: &State) -> DynamicImage{
         let v2 = Point3::new(v2.0, v2.1, v2.2);
 
         // Convert the vertices of the triangle to raster space
-        let mut v0_raster = convert_to_raster(&v0, &world_to_camera, l, r, t, b, near_clipping_plane, image_width, image_height);
-        let mut v1_raster = convert_to_raster(&v1, &world_to_camera, l, r, t, b, near_clipping_plane, image_width, image_height);
-        let mut v2_raster = convert_to_raster(&v2, &world_to_camera, l, r, t, b, near_clipping_plane, image_width, image_height);
+        let mut v0_raster = convert_to_raster(&v0, &camera_to_object, l, r, t, b, near_clipping_plane, image_width, image_height);
+        let mut v1_raster = convert_to_raster(&v1, &camera_to_object, l, r, t, b, near_clipping_plane, image_width, image_height);
+        let mut v2_raster = convert_to_raster(&v2, &camera_to_object, l, r, t, b, near_clipping_plane, image_width, image_height);
 
         // Precompute reciprocal of vertex z-coordinate
         v0_raster[2] = 1.0 / v0_raster[2];
@@ -197,6 +272,7 @@ pub fn render_state(state: &State) -> DynamicImage{
         let mut st0;
         let mut st1;
         let mut st2;
+
         if tex.is_empty() {
             st0 = (0.0, 0.0);
             st1 = (0.0, 0.0);
@@ -296,12 +372,12 @@ pub fn render_state(state: &State) -> DynamicImage{
         }
     }
 
-    println!("Counter: {}", counter);
+    // println!("Counter: {}", counter);
 
     let duration = start.elapsed();
-    println!("Rasterizer done! Took time: {} ms", duration.as_millis());
-    println!("Preparation time took: {} ms", preparation_time.as_millis());
-    println!("Inner loop time took: {} ms", inner_loop_time.as_millis());
+    // println!("Rasterizer done! Took time: {} ms", duration.as_millis());
+    // println!("Preparation time took: {} ms", preparation_time.as_millis());
+    // println!("Inner loop time took: {} ms", inner_loop_time.as_millis());
 
     let mut img = RgbImage::new(image_width as u32, image_height as u32);
     for y in 0..image_height {
@@ -311,7 +387,7 @@ pub fn render_state(state: &State) -> DynamicImage{
     }
 
     let img = DynamicImage::ImageRgb8(img);
-    img.save("image.tga").unwrap();
+    // img.save("image.tga").unwrap();
 
     img
 }
@@ -319,9 +395,19 @@ pub fn render_state(state: &State) -> DynamicImage{
 
 fn init_state(model: Model) -> State {
     println!("Building model!");
+    let distance = 100.0;
 
     State {
         model: model,
+        object_to_world: Matrix4::identity(),
+        camera: Camera {
+            distance: distance,
+            eye: Point3::new(0.0, 0.0, -distance),
+            look_at: Point3::new(0.0, 0.0, -distance - 1.0),
+            up: Vector3::new(0.0, 1.0, 0.0),
+        },
+        curr_mouse_x: 0.0,
+        curr_mouse_y: 0.0,
     }
 }
 
