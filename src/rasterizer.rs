@@ -3,7 +3,7 @@ use std::cmp;
 use std::f32::consts::{PI};
 use std::env;
 
-use nalgebra::{Matrix4, Matrix3, Point3, Vector3};
+use nalgebra::{Matrix4, Vector3, Point3};
 use nannou::prelude::*;
 use nannou::image::{DynamicImage, RgbImage};
 use tobj::{Model};
@@ -23,7 +23,7 @@ struct State {
     camera: Camera,
     curr_mouse_x: f32,
     curr_mouse_y: f32,
-    object_to_world: Matrix4<f32>,
+    object_to_world: AffineMat3,
     // is_mouse_inited: bool,
     // curr_mouse_x: f32,
     // curr_mouse_y: f32,
@@ -37,29 +37,28 @@ struct State {
 
 struct Camera {
     pub distance: f32, // Determines the ball radius for arcball
-    pub eye: Point3<f32>,
-    pub look_at: Point3<f32>,
-    pub up: Vector3<f32>,
+    pub eye: Point,
+    pub look_at: Point,
+    pub up: Vec3,
 }
 
 
 impl Camera {
-    fn compute_view_matrix(&self) -> Matrix4<f32> {
-        Matrix4::look_at_rh(&self.eye, &self.look_at, &self.up)
+    fn compute_view_matrix(&self) -> AffineMat3 {
+        AffineMat3::new_view_matrix(&self.eye, &self.look_at, &self.up)
     }
 
-    fn compute_arcball_vector_for_xy(x: f32, y: f32) -> Vector3<f32> {
+    fn compute_arcball_vector_for_xy(x: f32, y: f32) -> Vec3 {
         // Computing x, y, in [-1, 1] coords
-        let mut result = Vector3::new(x / WIDTH as f32, y / HEIGHT as f32, 0.0);
-        // result[1] = -result[1];
+        let mut result = Vec3::new(x / WIDTH as f32, y / HEIGHT as f32, 0.0);
+        // result.y = -result.y;
 
         // Normalizing
-        let curr_norm_squared = result[0] * result[0] + result[1] * result[1];
-
+        let curr_norm_squared = result.x * result.x + result.y * result.y;
         if (curr_norm_squared < 1.0) {
             result.z = (1.0 - curr_norm_squared).sqrt();
         } else {
-            result.normalize_mut();
+            result = result.normalize();
         }
 
         result
@@ -100,25 +99,25 @@ fn compute_screen_coordinates(
 
 
 fn convert_to_raster(
-    vertex: &Point3<f32>, object_to_camera: &Matrix4<f32>, l: f32, r: f32, t: f32, b: f32,
-    near: f32, image_width: usize, image_height: usize) -> Point3<f32> {
+    vertex: &Point, object_to_camera: &AffineMat3, l: f32, r: f32, t: f32, b: f32,
+    near: f32, image_width: usize, image_height: usize) -> Point {
 
-    let mut result = object_to_camera.transform_point(vertex);
+    let mut result = object_to_camera * vertex;
 
     // convert to screen space
-    result[0] = near * result[0] / -result[2];
-    result[1] = near * result[1] / -result[2];
+    result.x = near * result.x / -result.z;
+    result.y = near * result.y / -result.z;
 
     // now convert point from screen space to NDC space (in range [-1,1])
-    result[0] = 2.0 * result[0] / (r - l) - (r + l) / (r - l);
-    result[1] = 2.0 * result[1] / (t - b) - (t + b) / (t - b);
+    result.x = 2.0 * result.x / (r - l) - (r + l) / (r - l);
+    result.y = 2.0 * result.y / (t - b) - (t + b) / (t - b);
 
     // convert to raster space
-    result[0] = (result[0] + 1.0) * 0.5 * (image_width as f32);
-    result[1] = (1.0 - result[1]) * 0.5 * (image_height as f32); // in raster space y is down so invert direction
-    result[2] = -result[2];
+    result.x = (result.x + 1.0) * 0.5 * (image_width as f32);
+    result.y = (1.0 - result.y) * 0.5 * (image_height as f32); // in raster space y is down so invert direction
+    result.z = -result.z;
 
-    return result
+    result
 }
 
 
@@ -135,23 +134,30 @@ fn update_on_event(app: &App, state: &mut State, event: Event) {
     println!("Mouse pos: {} {} {} {}", state.curr_mouse_x, state.curr_mouse_y, app.mouse.x, app.mouse.y);
     let prev_arcball_vec = Camera::compute_arcball_vector_for_xy(state.curr_mouse_x, state.curr_mouse_y);
     let curr_arcball_vec = Camera::compute_arcball_vector_for_xy(app.mouse.x, app.mouse.y);
-    let angle = prev_arcball_vec.dot(&curr_arcball_vec).min(1.0).acos();
+    let angle = prev_arcball_vec.dot_product(&curr_arcball_vec).min(1.0).acos();
     let world_to_camera = state.camera.compute_view_matrix();
-    let object_to_camera = state.object_to_world * &world_to_camera;
-    let camera_to_object = object_to_camera.try_inverse().unwrap();
-    let axis_camera = prev_arcball_vec.cross(&curr_arcball_vec);
-    let axis_camera = curr_arcball_vec.cross(&prev_arcball_vec);
-    let axis_obj = camera_to_object.transform_vector(&axis_camera).normalize();
-    let rotation = Matrix4::new_rotation_wrt_point(&axis_obj * angle, Point3::new(0.0, 0.0, 0.0));
+    let object_to_camera = &state.object_to_world * &world_to_camera;
+    let camera_to_object = &object_to_camera.compute_inverse();
+    // let axis_camera = &prev_arcball_vec.cross_product(&curr_arcball_vec);
+    let axis_camera = &curr_arcball_vec.cross_product(&prev_arcball_vec);
+    let axis_obj = (camera_to_object * axis_camera).normalize();
+    // let rotation = Matrix4::new_rotation_wrt_point(&axis_obj * angle, Point3::new(0.0, 0.0, 0.0));
+    let rotation = AffineMat3::rotation(angle, &axis_obj);
 
-    println!("prev_arcball_vec: {}", prev_arcball_vec);
-    println!("curr_arcball_vec: {}", curr_arcball_vec);
-    println!("axis_camera: {}", axis_camera);
-    println!("axis_obj: {}", axis_obj);
-    println!("angle: {}", angle);
-    println!("rotation: {}", rotation);
+    // println!("prev_arcball_vec: {:?}", &prev_arcball_vec);
+    // println!("curr_arcball_vec: {:?}", &curr_arcball_vec);
+    // println!("axis_camera: {:?}", &axis_camera);
+    // println!("axis_obj: {:?}", &axis_obj);
+    // println!("angle: {:?}", &angle);
+    // println!("rotation: {:?}", &rotation);
+    // Matrix4::look_at_rh(&self.eye, &self.look_at, &self.up)
+    // println!("My: {}", &rotation);
+    // println!("Theirs: {}", Matrix4::new_rotation_wrt_point(
+    //     &Vector3::new(axis_obj.x, axis_obj.y, axis_obj.z) * angle,
+    //     Point3::new(0.0, 0.0, 0.0),
+    // ));
 
-    state.object_to_world = rotation * &state.object_to_world;
+    state.object_to_world = &rotation * &state.object_to_world;
     state.curr_mouse_x = app.mouse.x;
     state.curr_mouse_y = app.mouse.y;
 }
@@ -221,8 +227,8 @@ fn render_state(state: &State) -> DynamicImage{
     //     0.0, 0.0, 0.0, 1.0
     // );
     let world_to_camera = state.camera.compute_view_matrix();
-    let object_to_camera = state.object_to_world * &world_to_camera;
-    let camera_to_object = object_to_camera.try_inverse().unwrap();
+    let object_to_camera = &state.object_to_world * &world_to_camera;
+    let camera_to_object = object_to_camera.compute_inverse();
     // let image_width: usize = 1280;
     // let image_height: usize = 960;
     let image_width: usize = WIDTH;
@@ -245,17 +251,14 @@ fn render_state(state: &State) -> DynamicImage{
 
     for i in 0..(num_triangles as usize) {
         let preparation_start = Instant::now();
-        let idx_1 = model.mesh.indices[i * 3] as usize;
+
+        let idx_1 = model.mesh.indices[i * 3 + 0] as usize;
         let idx_2 = model.mesh.indices[i * 3 + 1] as usize;
         let idx_3 = model.mesh.indices[i * 3 + 2] as usize;
 
-        let v0 = (model.mesh.positions[idx_1 * 3 + 0], model.mesh.positions[idx_1 * 3 + 1], model.mesh.positions[idx_1 * 3 + 2]);
-        let v1 = (model.mesh.positions[idx_2 * 3 + 0], model.mesh.positions[idx_2 * 3 + 1], model.mesh.positions[idx_2 * 3 + 2]);
-        let v2 = (model.mesh.positions[idx_3 * 3 + 0], model.mesh.positions[idx_3 * 3 + 1], model.mesh.positions[idx_3 * 3 + 2]);
-
-        let v0 = Point3::new(v0.0, v0.1, v0.2);
-        let v1 = Point3::new(v1.0, v1.1, v1.2);
-        let v2 = Point3::new(v2.0, v2.1, v2.2);
+        let v0 = Point::new(model.mesh.positions[idx_1 * 3 + 0], model.mesh.positions[idx_1 * 3 + 1], model.mesh.positions[idx_1 * 3 + 2]);
+        let v1 = Point::new(model.mesh.positions[idx_2 * 3 + 0], model.mesh.positions[idx_2 * 3 + 1], model.mesh.positions[idx_2 * 3 + 2]);
+        let v2 = Point::new(model.mesh.positions[idx_3 * 3 + 0], model.mesh.positions[idx_3 * 3 + 1], model.mesh.positions[idx_3 * 3 + 2]);
 
         // Convert the vertices of the triangle to raster space
         let mut v0_raster = convert_to_raster(&v0, &camera_to_object, l, r, t, b, near_clipping_plane, image_width, image_height);
@@ -263,12 +266,12 @@ fn render_state(state: &State) -> DynamicImage{
         let mut v2_raster = convert_to_raster(&v2, &camera_to_object, l, r, t, b, near_clipping_plane, image_width, image_height);
 
         // Precompute reciprocal of vertex z-coordinate
-        v0_raster[2] = 1.0 / v0_raster[2];
-        v1_raster[2] = 1.0 / v1_raster[2];
-        v2_raster[2] = 1.0 / v2_raster[2];
+        v0_raster.z = 1.0 / v0_raster.z;
+        v1_raster.z = 1.0 / v1_raster.z;
+        v2_raster.z = 1.0 / v2_raster.z;
 
         // Prepare vertex attributes. Divde them by their vertex z-coordinate
-        // (though we use a multiplication here because v[2] = 1 / v[2])
+        // (though we use a multiplication here because v.z = 1 / v.z)
         let mut st0;
         let mut st1;
         let mut st2;
@@ -282,18 +285,18 @@ fn render_state(state: &State) -> DynamicImage{
             st1 = (tex[idx_2 * 2], tex[idx_2 * 2 + 1]);
             st2 = (tex[idx_3 * 2], tex[idx_3 * 2 + 1]);
 
-            st0.0 *= v0_raster[2];
-            st0.1 *= v0_raster[2];
-            st1.0 *= v1_raster[2];
-            st1.1 *= v1_raster[2];
-            st2.0 *= v2_raster[2];
-            st2.1 *= v2_raster[2];
+            st0.0 *= v0_raster.z;
+            st0.1 *= v0_raster.z;
+            st1.0 *= v1_raster.z;
+            st1.1 *= v1_raster.z;
+            st2.0 *= v2_raster.z;
+            st2.1 *= v2_raster.z;
         }
 
-        let x_min = min_of_three(v0_raster[0], v1_raster[0], v2_raster[0]);
-        let y_min = min_of_three(v0_raster[1], v1_raster[1], v2_raster[1]);
-        let x_max = max_of_three(v0_raster[0], v1_raster[0], v2_raster[0]);
-        let y_max = max_of_three(v0_raster[1], v1_raster[1], v2_raster[1]);
+        let x_min = min_of_three(v0_raster.x, v1_raster.x, v2_raster.x);
+        let y_min = min_of_three(v0_raster.y, v1_raster.y, v2_raster.y);
+        let x_max = max_of_three(v0_raster.x, v1_raster.x, v2_raster.x);
+        let y_max = max_of_three(v0_raster.y, v1_raster.y, v2_raster.y);
 
         // the triangle is out of screen
         if (x_min > (image_width - 1) as f32 || x_max < 0.0 || y_min > (image_height - 1) as f32 || y_max < 0.0) {
@@ -313,7 +316,7 @@ fn render_state(state: &State) -> DynamicImage{
         for y in y0..(y1 + 1) {
             for x in x0..(x1 + 1) {
                 let inner_loop_stuff_start = Instant::now();
-                let pixel_pos = Point3::new(x as f32 + 0.5, y as f32 + 0.5, 0.0);
+                let pixel_pos = Point::new(x as f32 + 0.5, y as f32 + 0.5, 0.0);
                 let mut w0 = edge_function(&v1_raster, &v2_raster, &pixel_pos);
                 let mut w1 = edge_function(&v2_raster, &v0_raster, &pixel_pos);
                 let mut w2 = edge_function(&v0_raster, &v1_raster, &pixel_pos);
@@ -323,7 +326,7 @@ fn render_state(state: &State) -> DynamicImage{
                     w0 /= area;
                     w1 /= area;
                     w2 /= area;
-                    let one_div_z = v0_raster[2] * w0 + v1_raster[2] * w1 + v2_raster[2] * w2;
+                    let one_div_z = v0_raster.z * w0 + v1_raster.z * w1 + v2_raster.z * w2;
                     let z = 1.0 / one_div_z;
 
                     // Depth-buffer test
@@ -341,21 +344,21 @@ fn render_state(state: &State) -> DynamicImage{
                         // point in camera space. Proceed like with the other vertex attribute.
                         // Divide the point coordinates by the vertex z-coordinate then
                         // interpolate using barycentric coordinates and finally multiply by sample depth.
-                        let v0_cam = world_to_camera.transform_point(&v0);
-                        let v1_cam = world_to_camera.transform_point(&v1);
-                        let v2_cam = world_to_camera.transform_point(&v2);
+                        let v0_cam = &world_to_camera * &v0;
+                        let v1_cam = &world_to_camera * &v1;
+                        let v2_cam = &world_to_camera * &v2;
 
-                        let px = (v0_cam[0]/-v0_cam[2]) * w0 + (v1_cam[0]/-v1_cam[2]) * w1 + (v2_cam[0]/-v2_cam[2]) * w2;
-                        let py = (v0_cam[1]/-v0_cam[2]) * w0 + (v1_cam[1]/-v1_cam[2]) * w1 + (v2_cam[1]/-v2_cam[2]) * w2;
-                        let pt = Point3::new(px * z, py * z, -z); // pt is in camera space
+                        let px = (v0_cam.x/-v0_cam.z) * w0 + (v1_cam.x/-v1_cam.z) * w1 + (v2_cam.x/-v2_cam.z) * w2;
+                        let py = (v0_cam.y/-v0_cam.z) * w0 + (v1_cam.y/-v1_cam.z) * w1 + (v2_cam.y/-v2_cam.z) * w2;
+                        let pt = Point::new(px * z, py * z, -z); // pt is in camera space
 
                         // Compute the face normal which is used for a simple facing ratio.
                         // Keep in mind that we are doing all calculation in camera space.
                         // Thus the view direction can be computed as the point on the object
                         // in camera space minus Vec3f(0), the position of the camera in camera space.
-                        let normal = (&((v1_cam - v0_cam).cross(&(v2_cam - v0_cam)))).normalize();
-                        let view_direction = (&-Vector3::new(pt[0], pt[1], pt[2])).normalize();
-                        let mut n_dot_view = normal.dot(&view_direction).max(0.0);
+                        let normal = (&((&v1_cam - &v0_cam).cross_product(&(&v2_cam - &v0_cam)))).normalize();
+                        let view_direction = (-&Vec3::new(pt.x, pt.y, pt.z)).normalize();
+                        let mut n_dot_view = normal.dot_product(&view_direction).max(0.0);
 
                         // The final color is the reuslt of the faction ration multiplied by the
                         // checkerboard pattern.
@@ -399,12 +402,12 @@ fn init_state(model: Model) -> State {
 
     State {
         model: model,
-        object_to_world: Matrix4::identity(),
+        object_to_world: AffineMat3::identity(),
         camera: Camera {
             distance: distance,
-            eye: Point3::new(0.0, 0.0, -distance),
-            look_at: Point3::new(0.0, 0.0, -distance - 1.0),
-            up: Vector3::new(0.0, 1.0, 0.0),
+            eye: Point::new(0.0, 0.0, -distance),
+            look_at: Point::new(0.0, 0.0, -distance - 1.0),
+            up: Vec3::new(0.0, 1.0, 0.0),
         },
         curr_mouse_x: 0.0,
         curr_mouse_y: 0.0,
@@ -413,9 +416,9 @@ fn init_state(model: Model) -> State {
 
 
 #[inline]
-fn edge_function(u: &Point3<f32>, v: &Point3<f32>, point: &Point3<f32>) -> f32 {
+fn edge_function(u: &Point, v: &Point, point: &Point) -> f32 {
     // Given two vectors u, v, computes the edge function for the given point
-    (point[0] - u[0]) * (v[1] - u[1]) - (point[1] - u[1]) * (v[0] - u[0])
+    (point.x - u.x) * (v.y - u.y) - (point.y - u.y) * (v.x - u.x)
 }
 
 

@@ -1,4 +1,5 @@
 use std::ops;
+use std::fmt;
 use crate::basics::{Vec3, Point};
 
 #[derive(Debug, Clone)]
@@ -23,7 +24,7 @@ impl Mat3 {
         ]}
     }
 
-    pub fn rotation(angle: f32, axis: Vec3) -> Self {
+    pub fn rotation(angle: f32, axis: &Vec3) -> Self {
         Mat3 {rows: [
             Vec3::new(
                 (axis.x.powi(2) + (axis.y.powi(2) + axis.z.powi(2)) * angle.cos()) / axis.norm_squared(),
@@ -191,23 +192,23 @@ impl AffineMat3 {
         }
     }
 
+    pub fn identity() -> Self {
+        AffineMat3 {
+            transform_mat: Mat3::identity(),
+            translation: Vec3::zero()
+        }
+    }
+
     pub fn translation(translation: Vec3) -> Self {
         AffineMat3::new(Mat3::identity(), translation)
     }
 
-    pub fn rotation(angle: f32, axis: Vec3) -> Self {
+    pub fn rotation(angle: f32, axis: &Vec3) -> Self {
         AffineMat3::new(Mat3::rotation(angle, axis), Vec3::zero())
     }
 
     pub fn scale(scales: Vec3) -> Self {
         AffineMat3::new(Mat3::scale(scales), Vec3::zero())
-    }
-
-    pub fn identity() -> Self {
-        AffineMat3 {
-            transform_mat: Mat3::identity(),
-            translation: Vec3::new(0.0, 0.0, 0.0),
-        }
     }
 
     pub fn create_look_at(position: &Vec3, yaw: f32, pitch: f32) -> Self {
@@ -227,6 +228,20 @@ impl AffineMat3 {
         }
     }
 
+    pub fn new_view_matrix(position: &Point, target: &Point, up: &Vec3) -> Self {
+        let direction = (&(position - target)).normalize();
+        let right = (&up.cross_product(&direction)).normalize();
+        let new_up = direction.cross_product(&right);
+
+        let lhs = AffineMat3 {
+            transform_mat: Mat3 {rows: [right, new_up, direction]},
+            translation: Vec3::zero(),
+        };
+        let rhs = AffineMat3::translation((&-position).into());
+
+        &lhs * &rhs
+    }
+
     pub fn compute_inverse(&self) -> Self {
         let transform_inv = self.transform_mat.compute_inverse();
         let back_translation = &(&transform_inv * &self.translation) * -1.0;
@@ -244,12 +259,21 @@ impl ops::Mul<&AffineMat3> for &AffineMat3 {
 
     fn mul(self, other: &AffineMat3) -> AffineMat3 {
         AffineMat3 {
-            transform_mat: &self.transform_mat * &other.transform_mat.transpose(),
+            transform_mat: &self.transform_mat * &other.transform_mat,
             translation: &(&self.transform_mat * &other.translation) + &self.translation,
         }
     }
 }
 
+
+impl fmt::Display for &AffineMat3 {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "({}, {}, {}, {})\n ({}, {}, {}, {})\n ({}, {}, {}, {})\n",
+            self.transform_mat.rows[0].x, self.transform_mat.rows[0].y, self.transform_mat.rows[0].z, self.translation.x,
+            self.transform_mat.rows[1].x, self.transform_mat.rows[1].y, self.transform_mat.rows[1].z, self.translation.y,
+            self.transform_mat.rows[2].x, self.transform_mat.rows[2].y, self.transform_mat.rows[2].z, self.translation.z)
+    }
+}
 
 
 impl ops::Mul<&Vec3> for &AffineMat3 {

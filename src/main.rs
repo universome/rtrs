@@ -5,8 +5,8 @@ extern crate derive_more;
 extern crate itertools;
 #[macro_use]
 extern crate float_cmp;
-#[macro_use]
-extern crate nalgebra;
+// #[macro_use]
+// extern crate nalgebra;
 extern crate tobj;
 
 // mod scene;

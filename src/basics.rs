@@ -136,6 +136,15 @@ impl ops::Mul<f32> for &Vec3 {
 }
 
 
+impl ops::Neg for &Vec3 {
+    type Output = Vec3;
+
+    fn neg(self) -> Vec3 {
+        Vec3::new(-self.x, -self.y, -self.z)
+    }
+}
+
+
 impl From<&Point> for Vec3 {
     fn from(p: &Point) -> Self {
         Vec3 {x: p.x, y: p.y, z: p.z}
@@ -148,6 +157,12 @@ pub struct Point {
     pub x: f32,
     pub y: f32,
     pub z: f32,
+}
+
+impl Point {
+    pub fn new(x: f32, y: f32, z: f32) -> Self {
+        Point {x: x, y: y, z: z}
+    }
 }
 
 impl ops::Sub<&Point> for &Point {
@@ -173,6 +188,16 @@ impl ops::Add<&Vec3> for &Point {
         }
     }
 }
+
+
+impl ops::Neg for &Point {
+    type Output = Point;
+
+    fn neg(self) -> Point {
+        Point::new(-self.x, -self.y, -self.z)
+    }
+}
+
 
 impl From<Vec3> for Point {
     fn from(v: Vec3) -> Self {
