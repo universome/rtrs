@@ -1,15 +1,18 @@
 use std::cmp;
 use std::f32::consts::{PI};
+
 use nalgebra::{Matrix4, Point3, Vector3};
 use nannou::image::{DynamicImage, RgbImage};
+use tobj::{Model};
 
 // use crate::mesh::{Triangle};
 use crate::matrix::*;
 use crate::basics::*;
 
-use crate::cow::{nvertices, stindices, vertices, st};
+// use crate::cow::{nvertices, stindices, vertices, st};
 
 const inch_to_mm: f32 = 25.4;
+
 
 
 fn compute_screen_coordinates(
@@ -67,8 +70,9 @@ pub fn convert_to_raster(
 }
 
 
-pub fn launch() {
-    let num_triangles = 3156;
+pub fn launch(model: &Model) {
+    let num_triangles = model.mesh.num_face_indices.len();
+    let tex = &model.mesh.texcoords;
     let near_clipping_plane = 1.0;
     let far_clipping_plane = 1000.0;
     let focal_len = 20.0; // in mm
@@ -89,7 +93,6 @@ pub fn launch() {
         image_width, image_height,
         near_clipping_plane,
         focal_len);
-    // let (t, b, l, r) = (0.466725, -0.466725, -0.622300, 0.622300);
 
     // Vec3<unsigned char> *frameBuffer = new Vec3<unsigned char>[image_width * image_height];
     // let mut frame_buffer = [Color::new(0.0, 0.0, 0.0); (image_width * image_height) as usize];
@@ -100,9 +103,13 @@ pub fn launch() {
     let mut counter = 0;
 
     for i in 0..(num_triangles as usize) {
-        let v0 = vertices[nvertices[i * 3]];
-        let v1 = vertices[nvertices[i * 3 + 1]];
-        let v2 = vertices[nvertices[i * 3 + 2]];
+        let idx_1 = model.mesh.indices[i * 3] as usize;
+        let idx_2 = model.mesh.indices[i * 3 + 1] as usize;
+        let idx_3 = model.mesh.indices[i * 3 + 2] as usize;
+
+        let v0 = (model.mesh.positions[idx_1 * 3 + 0], model.mesh.positions[idx_1 * 3 + 1], model.mesh.positions[idx_1 * 3 + 2]);
+        let v1 = (model.mesh.positions[idx_2 * 3 + 0], model.mesh.positions[idx_2 * 3 + 1], model.mesh.positions[idx_2 * 3 + 2]);
+        let v2 = (model.mesh.positions[idx_3 * 3 + 0], model.mesh.positions[idx_3 * 3 + 1], model.mesh.positions[idx_3 * 3 + 2]);
 
         let v0 = Point3::new(v0.0, v0.1, v0.2);
         let v1 = Point3::new(v1.0, v1.1, v1.2);
@@ -120,9 +127,9 @@ pub fn launch() {
 
         // Prepare vertex attributes. Divde them by their vertex z-coordinate
         // (though we use a multiplication here because v[2] = 1 / v[2])
-        let mut st0 = st[stindices[i * 3]];
-        let mut st1 = st[stindices[i * 3 + 1]];
-        let mut st2 = st[stindices[i * 3 + 2]];
+        let mut st0 = (tex[idx_1 * 2], tex[idx_1 * 2 + 1]);
+        let mut st1 = (tex[idx_2 * 2], tex[idx_2 * 2 + 1]);
+        let mut st2 = (tex[idx_3 * 2], tex[idx_3 * 2 + 1]);
 
         st0.0 *= v0_raster[2];
         st0.1 *= v0_raster[2];
@@ -195,9 +202,9 @@ pub fn launch() {
                         // Keep in mind that we are doing all calculation in camera space.
                         // Thus the view direction can be computed as the point on the object
                         // in camera space minus Vec3f(0), the position of the camera in camera space.
-                        let mut n = (&((v1_cam - v0_cam).cross(&(v2_cam - v0_cam)))).normalize();
+                        let normal = (&((v1_cam - v0_cam).cross(&(v2_cam - v0_cam)))).normalize();
                         let view_direction = (&-Vector3::new(pt[0], pt[1], pt[2])).normalize();
-                        let mut n_dot_view = n.dot(&view_direction).max(0.0);
+                        let mut n_dot_view = normal.dot(&view_direction).max(0.0);
 
                         // The final color is the reuslt of the faction ration multiplied by the
                         // checkerboard pattern.
