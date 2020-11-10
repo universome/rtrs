@@ -1,7 +1,10 @@
+use std::time::{Instant, Duration};
 use std::cmp;
 use std::f32::consts::{PI};
+use std::env;
 
 use nalgebra::{Matrix4, Point3, Vector3};
+use nannou::prelude::*;
 use nannou::image::{DynamicImage, RgbImage};
 use tobj::{Model};
 
@@ -9,10 +12,22 @@ use tobj::{Model};
 use crate::matrix::*;
 use crate::basics::*;
 
-// use crate::cow::{nvertices, stindices, vertices, st};
-
 const inch_to_mm: f32 = 25.4;
+const WIDTH: u32 = 640;
+const HEIGHT: u32 = 640;
 
+pub struct State {
+    model: Model,
+    // is_mouse_inited: bool,
+    // curr_mouse_x: f32,
+    // curr_mouse_y: f32,
+    // mouse_sensitivity: f32,
+    // move_speed: f32,
+    // mouse_is_in_window: bool,
+    // scroll_speed: f32,
+    // rotation_speed: f32,
+    // scale_speed: f32,
+}
 
 
 fn compute_screen_coordinates(
@@ -70,7 +85,49 @@ pub fn convert_to_raster(
 }
 
 
-pub fn launch(model: &Model) {
+pub fn launch(model: Model) {
+    nannou::app(init_app).event(update_on_event).run();
+}
+
+
+fn update_on_event(app: &App, state: &mut State, event: Event) {
+    // pass
+}
+
+
+fn init_app(app: &App) -> State {
+    let obj_file = env::args()
+        .skip(1)
+        .next()
+        .expect("A .obj file to print is required");
+    let (models, _) = tobj::load_obj(&obj_file, true).expect("Failed to load file");
+
+    app
+        .new_window()
+        .title("CS248 Computer Graphics")
+        .size(WIDTH, HEIGHT)
+        .view(render_and_display)
+        .build()
+        .unwrap();
+
+    init_state(models[0].clone())
+}
+
+
+fn render_and_display(app: &App, state: &State, frame: Frame) {
+    frame.clear(BLACK);
+
+    let draw = app.draw();
+    let img = render_state(state);
+    let texture = wgpu::Texture::from_image(app, &img);
+
+    draw.texture(&texture);
+    draw.to_frame(app, &frame).unwrap();
+}
+
+
+pub fn render_state(state: &State) -> DynamicImage{
+    let model = &state.model;
     let num_triangles = model.mesh.num_face_indices.len();
     let tex = &model.mesh.texcoords;
     let near_clipping_plane = 1.0;
@@ -79,30 +136,40 @@ pub fn launch(model: &Model) {
     let film_aperture_width = 0.980; // 35mm Full Aperture in inches
     let film_aperture_width = 0.735;
 
+    // let world_to_camera = Matrix4::new(
+    //     0.707107, 0.0, -0.707107, -1.63871,
+    //     -0.331295, 0.883452, -0.331295, -5.747777,
+    //     0.624695, 0.468521, 0.624695, -40.400412,
+    //     0.0, 0.0, 0.0, 1.0
+    // );
     let world_to_camera = Matrix4::new(
-        0.707107, 0.0, -0.707107, -1.63871,
-        -0.331295, 0.883452, -0.331295, -5.747777,
-        0.624695, 0.468521, 0.624695, -40.400412,
+        1.0, 0.0, 0.0, 0.0,
+        0.0, 1.0, 0.0, 0.0,
+        0.0, 0.0, 1.0, -40.400412,
         0.0, 0.0, 0.0, 1.0
     );
-    let image_width: usize = 1280;
-    let image_height: usize = 960;
+    // let image_width: usize = 1280;
+    // let image_height: usize = 960;
+    let image_width: usize = 640;
+    let image_height: usize = 480;
 
     let (t, b, l, r) = compute_screen_coordinates(
-        film_aperture_width, film_aperture_width,
-        image_width, image_height,
-        near_clipping_plane,
-        focal_len);
+        film_aperture_width, film_aperture_width, image_width,
+        image_height, near_clipping_plane, focal_len);
 
     // Vec3<unsigned char> *frameBuffer = new Vec3<unsigned char>[image_width * image_height];
     // let mut frame_buffer = [Color::new(0.0, 0.0, 0.0); (image_width * image_height) as usize];
     // let mut z_buffer = [far_clipping_plane; (image_width * image_height) as usize];
-    let mut frame_buffer = vec![Color::new(0.0, 0.0, 0.0); image_width * image_height];
+    let mut frame_buffer = vec![Color::new(1.0, 1.0, 1.0); image_width * image_height];
     let mut z_buffer = vec![far_clipping_plane; image_width * image_height];
 
     let mut counter = 0;
+    let start = Instant::now();
+    let mut preparation_time = Duration::from_secs(0);
+    let mut inner_loop_time = Duration::from_secs(0);
 
     for i in 0..(num_triangles as usize) {
+        let preparation_start = Instant::now();
         let idx_1 = model.mesh.indices[i * 3] as usize;
         let idx_2 = model.mesh.indices[i * 3 + 1] as usize;
         let idx_3 = model.mesh.indices[i * 3 + 2] as usize;
@@ -127,16 +194,25 @@ pub fn launch(model: &Model) {
 
         // Prepare vertex attributes. Divde them by their vertex z-coordinate
         // (though we use a multiplication here because v[2] = 1 / v[2])
-        let mut st0 = (tex[idx_1 * 2], tex[idx_1 * 2 + 1]);
-        let mut st1 = (tex[idx_2 * 2], tex[idx_2 * 2 + 1]);
-        let mut st2 = (tex[idx_3 * 2], tex[idx_3 * 2 + 1]);
+        let mut st0;
+        let mut st1;
+        let mut st2;
+        if tex.is_empty() {
+            st0 = (0.0, 0.0);
+            st1 = (0.0, 0.0);
+            st2 = (0.0, 0.0);
+        } else {
+            st0 = (tex[idx_1 * 2], tex[idx_1 * 2 + 1]);
+            st1 = (tex[idx_2 * 2], tex[idx_2 * 2 + 1]);
+            st2 = (tex[idx_3 * 2], tex[idx_3 * 2 + 1]);
 
-        st0.0 *= v0_raster[2];
-        st0.1 *= v0_raster[2];
-        st1.0 *= v1_raster[2];
-        st1.1 *= v1_raster[2];
-        st2.0 *= v2_raster[2];
-        st2.1 *= v2_raster[2];
+            st0.0 *= v0_raster[2];
+            st0.1 *= v0_raster[2];
+            st1.0 *= v1_raster[2];
+            st1.1 *= v1_raster[2];
+            st2.0 *= v2_raster[2];
+            st2.1 *= v2_raster[2];
+        }
 
         let x_min = min_of_three(v0_raster[0], v1_raster[0], v2_raster[0]);
         let y_min = min_of_three(v0_raster[1], v1_raster[1], v2_raster[1]);
@@ -156,17 +232,16 @@ pub fn launch(model: &Model) {
 
         let area = edge_function(&v0_raster, &v1_raster, &v2_raster);
 
+        preparation_time += preparation_start.elapsed();
+
         for y in y0..(y1 + 1) {
             for x in x0..(x1 + 1) {
-                counter += 1;
+                let inner_loop_stuff_start = Instant::now();
                 let pixel_pos = Point3::new(x as f32 + 0.5, y as f32 + 0.5, 0.0);
                 let mut w0 = edge_function(&v1_raster, &v2_raster, &pixel_pos);
                 let mut w1 = edge_function(&v2_raster, &v0_raster, &pixel_pos);
                 let mut w2 = edge_function(&v0_raster, &v1_raster, &pixel_pos);
-
-                // if (i == 0) {
-                //     println!("w: {}, {}, {}", w0, w1, w2);
-                // }
+                inner_loop_time += inner_loop_stuff_start.elapsed();
 
                 if (w0 >= 0.0 && w1 >= 0.0 && w2 >= 0.0) {
                     w0 /= area;
@@ -221,6 +296,13 @@ pub fn launch(model: &Model) {
         }
     }
 
+    println!("Counter: {}", counter);
+
+    let duration = start.elapsed();
+    println!("Rasterizer done! Took time: {} ms", duration.as_millis());
+    println!("Preparation time took: {} ms", preparation_time.as_millis());
+    println!("Inner loop time took: {} ms", inner_loop_time.as_millis());
+
     let mut img = RgbImage::new(image_width as u32, image_height as u32);
     for y in 0..image_height {
         for x in 0..image_width {
@@ -231,12 +313,22 @@ pub fn launch(model: &Model) {
     let img = DynamicImage::ImageRgb8(img);
     img.save("image.tga").unwrap();
 
-    println!("Rasterizer done!");
+    img
 }
+
+
+fn init_state(model: Model) -> State {
+    println!("Building model!");
+
+    State {
+        model: model,
+    }
+}
+
 
 #[inline]
 fn edge_function(u: &Point3<f32>, v: &Point3<f32>, point: &Point3<f32>) -> f32 {
-    // Given two vectors u, v, computes the edge function for point for the given point
+    // Given two vectors u, v, computes the edge function for the given point
     (point[0] - u[0]) * (v[1] - u[1]) - (point[1] - u[1]) * (v[0] - u[0])
 }
 

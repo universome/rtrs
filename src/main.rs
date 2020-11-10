@@ -23,7 +23,7 @@ mod mesh;
 
 fn main() {
     // rayon::ThreadPoolBuilder::new().num_threads(8).build_global().unwrap();
-    rayon::ThreadPoolBuilder::new().num_threads(16).build_global().unwrap();
+    // rayon::ThreadPoolBuilder::new().num_threads(16).build_global().unwrap();
 
     let obj_file = env::args()
         .skip(1)
@@ -87,5 +87,5 @@ fn main() {
     //         println!("    material.{} = {}", k, v);
     //     }
     // }
-    rasterizer::launch(&models[0]);
+    rasterizer::launch(models[0].clone());
 }
