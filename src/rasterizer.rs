@@ -30,6 +30,7 @@ struct State {
     light_position: Point,
     is_gouraud_shading: bool,
     is_antialiasing: bool,
+    specular_lighting_enabled: bool,
 }
 
 struct Camera {
@@ -157,6 +158,10 @@ fn update_on_event(app: &App, state: &mut State, event: Event) {
 
                     if key == Key::A {
                         state.is_antialiasing = !state.is_antialiasing;
+                    }
+
+                    if key == Key::S {
+                        state.specular_lighting_enabled = !state.specular_lighting_enabled;
                     }
                 },
                 _ => {}
@@ -305,6 +310,15 @@ fn render_state(state: &State) -> DynamicImage{
             face_normal_camera.dot_product(&light_dirs.2),
         );
 
+        let mut gouraud_speculars = (0.0, 0.0, 0.0);
+        if state.specular_lighting_enabled {
+            gouraud_speculars = (
+                compute_specular(&face_normal_camera, &(-&Vec3::new(v0_camera.x, v0_camera.y, v0_camera.z)).normalize(), &light_dirs.0),
+                compute_specular(&face_normal_camera, &(-&Vec3::new(v1_camera.x, v1_camera.y, v1_camera.z)).normalize(), &light_dirs.1),
+                compute_specular(&face_normal_camera, &(-&Vec3::new(v2_camera.x, v2_camera.y, v2_camera.z)).normalize(), &light_dirs.2),
+            );
+        }
+
         let (mut normal_v0_camera, mut normal_v1_camera, mut normal_v2_camera) = (Vec3::zero(), Vec3::zero(), Vec3::zero());
         if !state.is_gouraud_shading {
             let normal_v0 = Vec3::new(model.mesh.normals[idx_1 * 3 + 0], model.mesh.normals[idx_1 * 3 + 1], model.mesh.normals[idx_1 * 3 + 2]);
@@ -371,7 +385,6 @@ fn render_state(state: &State) -> DynamicImage{
                 if (bar_coords.0 >= 0.0 && bar_coords.1 >= 0.0 && bar_coords.2 >= 0.0) {
                     let depth = 1.0 / (v0_raster.z * bar_coords.0 + v1_raster.z * bar_coords.1 + v2_raster.z * bar_coords.2);
 
-                    // Depth-buffer test
                     if (depth < z_buffer[y * frame_width + x]) {
                         z_buffer[y * frame_width + x] = depth;
 
@@ -380,16 +393,15 @@ fn render_state(state: &State) -> DynamicImage{
                         //     (st0.1 * bar_coords.0 + st1.1 * bar_coords.1 + st2.1 * bar_coords.2) * depth
                         // );
 
-                        // Compute the face normal which is used for a simple facing ratio.
-                        // Keep in mind that we are doing all calculation in camera space.
-                        // Thus the view direction can be computed as the point on the object
-                        // in camera space minus Vec3f(0), the position of the camera in camera space.
-                        // let view_direction = (-&Vec3::new(pos_camera.x, pos_camera.y, pos_camera.z)).normalize();
-                        // let mut n_dot_view = face_normal_camera.dot_product(&view_direction).max(0.0);
-
                         let mut color;
+                        let ambient_strength = 0.1;
                         if state.is_gouraud_shading {
-                            color = 0.7 * colors_gouraud.0 * bar_coords.0 + colors_gouraud.1 * bar_coords.1 + colors_gouraud.2 * bar_coords.2;
+                            let diffuse_strength = 0.7 * colors_gouraud.0 * bar_coords.0 + colors_gouraud.1 * bar_coords.1 + colors_gouraud.2 * bar_coords.2;
+                            color = ambient_strength + diffuse_strength;
+
+                            if state.specular_lighting_enabled {
+                                color += gouraud_speculars.0 * bar_coords.0 + gouraud_speculars.1 * bar_coords.1 + gouraud_speculars.2 * bar_coords.2;
+                            }
                         } else {
                             let px = (v0_camera.x / -v0_camera.z) * bar_coords.0 + (v1_camera.x / -v1_camera.z) * bar_coords.1 + (v2_camera.x / -v2_camera.z) * bar_coords.2;
                             let py = (v0_camera.y / -v0_camera.z) * bar_coords.0 + (v1_camera.y / -v1_camera.z) * bar_coords.1 + (v2_camera.y / -v2_camera.z) * bar_coords.2;
@@ -397,18 +409,20 @@ fn render_state(state: &State) -> DynamicImage{
                             let light_dir = (&light_pos_camera - &pos_camera).normalize();
                             // let point_normal_camera = normal_v0_camera * bar_coords.0 + normal_v1_camera * bar_coords.1 + normal_v2_camera * bar_coords.2;
                             let point_normal_camera = (&normal_v0_camera * bar_coords.0  + &normal_v1_camera * bar_coords.1  + &normal_v2_camera * bar_coords.2).normalize();
+                            let diffuse_strength = point_normal_camera.dot_product(&light_dir);
+                            color = ambient_strength + diffuse_strength;
 
-                            color = point_normal_camera.dot_product(&light_dir);
+                            if (state.specular_lighting_enabled) {
+                                let view_direction = (-&Vec3::new(pos_camera.x, pos_camera.y, pos_camera.z)).normalize();
+                                // let normal_dot_light = point_normal_camera.dot_product(&light_dir).max(0.0);
+                                // let reflect_dir = &(&-&light_dir + &(&point_normal_camera * (2.0 * normal_dot_light)));
+                                // let reflect_dot_view = view_direction.dot_product(&reflect_dir).max(0.0);
+
+                                // color = color + 0.5 * reflect_dot_view.powi(32);
+                                color += compute_specular(&point_normal_camera, &view_direction, &light_dir);
+                            }
                         }
 
-                        // // The final color is the reuslt of the faction ration multiplied by the
-                        // // checkerboard pattern.
-                        // let M = 10.0;
-                        // let checker = (((tex_coords.0 * M) % 1.0) > 0.5) ^ (((tex_coords.1 * M) % 1.0) < 0.5);
-                        // let c = if checker { 0.7 } else { 0.3 };
-                        // n_dot_view *= c;
-
-                        color += 0.1; // Ambient component
                         frame_buffer[y * frame_width + x] = Color::new(color, color, color);
                     }
                 }
@@ -476,6 +490,7 @@ fn init_state(model: Model) -> State {
         light_position: Point::new(0.0, 100.0, 0.0),
         is_gouraud_shading: true,
         is_antialiasing: false,
+        specular_lighting_enabled: false,
     }
 }
 
@@ -503,4 +518,13 @@ fn max_of_three(a: f32, b: f32, c: f32) -> f32 {
     } else {
         if b > c { b } else { c }
     }
+}
+
+#[inline]
+fn compute_specular(normal: &Vec3, view_dir: &Vec3, light_dir: &Vec3) -> f32 {
+    let normal_dot_light = normal.dot_product(light_dir).max(0.0);
+    let reflect_dir = &(&-light_dir + &(normal * (2.0 * normal_dot_light)));
+    let reflect_dot_view = view_dir.dot_product(&reflect_dir).max(0.0);
+
+    0.5 * reflect_dot_view.powi(32)
 }
