@@ -1,27 +1,26 @@
-## Assignment 2
+## Assignment 3
 
-![Result](../images/assignment-2/image.png "Result")
+![Result](../images/assignment-3/image.png "Result")
 
 ### Scene description
-We have a cone (centered at `(0.0, 0.0, 0.0)`) and two sphers round around.
-We have a light source from them.
-Example images are located in `../images/assignment-1` directory.
+I implemented the rasterizer which takes either KAUST Beacon model or face model obj as input as renders.
+You can pass other models as well, but you would need to specify a camera distance for them then.
 
 ### Controls
-- Mouse movement + `W`/`A`/`S`/`D` — move camera
-- Mouse scroll — zoom in and zoom out
-- Mouse click — select an object
-- `L` — select the light source
-- Top/down/left/right — move the selected object parallel to the viwwing plane
-- `I`/`O`/`P` — rotate an object across x/y/z axis
-- `1`/`2`/`3` + up/down arrow — scale object across x/y/z dimension
-- `Q` — set everything to default
+- Mouse scroll — zoom in and zoom out (but no cliping is implemented so zoom at your own risk)
+- Mouse click and move — arcball rotation of the object
+- `L` — switch between Gouraud and Phong shading (Phong shading works only if your obj file specifies normals)
+- `T` — enable texture mapping with stripe effect
+- `A` — enable/disable antialiasing via supersampling
+- `Q` — enable/disable specular lighting
+- `S` — save the current frame
 
 ### How to run the code
 You need to [install Rust on your system](https://www.rust-lang.org/tools/install) and then just type the command:
 ```
-cargo run --release
+cargo run --release MODEL_PATH
 ```
+where `MODEL_PATH` is either `resources/KAUST_Beacon.obj` or `resources/bs_ears.obj`.
 
 The binary file will be located at `target/release/cs248-computer-graphics`.
 There is also a binary attached which is located at `cs248-computer-graphics` (Note: compiled on OS X Catalina 10.15.6).
@@ -30,13 +29,11 @@ There is also a binary attached which is located at `cs248-computer-graphics` (N
 - phong shading
 - simple antialisasing (via supersampling)
 - zoom-in/zoom-out (_without_ clipping)
-- specular lighting (for both gouraud and phong)
+- specular lighting (for both Gouraud and Phong)
 - texture mapping with stripe effect
 - backface culling
 
 ### Screenshots
-![Camera away](../images/assignment-2/camera-away.png "camera-away")
-![Rotation example](../images/assignment-2/rotate.png "rotation-example")
-![Scale](../images/assignment-2/scale.png "scaling")
-![Zoom in](../images/assignment-2/zoom-in.png "zoom-in")
-![Zoom out](../images/assignment-2/zoom-out.png "zoom-out")
+![KAUST Beacon bottom](../images/assignment-3/beacon-bottom.png "KAUST Beacon bottom")
+![Face with Gouraud shading](../images/assignment-3/face.png "Face with Gouraud shading")
+![Face with Phong shading + Specular lighting + Antialiasing + Stripes](../images/assignment-3/face-all-features.png "Face with Phong shading + Specular lighting + Antialiasing + Stripes")

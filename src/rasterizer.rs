@@ -139,7 +139,7 @@ fn update_on_event(app: &App, state: &mut State, event: Event) {
                     }
 
                     if key == Key::S {
-                        render_state(state).save("image.tga").unwrap();
+                        render_state(state).save("image.png").unwrap();
                         println!("Saved the image!");
                     }
                 },
@@ -197,7 +197,7 @@ fn init_app(app: &App) -> State {
         .build()
         .unwrap();
 
-    let camera_distance = if obj_file == "resources/KAUST_Beacon.obj" {-1000.0} else {-2.0};
+    let camera_distance = if obj_file == "resources/KAUST_Beacon.obj" {-800.0} else {-2.0};
     let mut state = init_state(models[0].clone(), camera_distance);
 
     (*app.main_window()).set_cursor_position_points(WIDTH as f32 / 2.0, HEIGHT as f32 / 2.0);
