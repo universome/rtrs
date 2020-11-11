@@ -190,7 +190,7 @@ fn init_app(app: &App) -> State {
         .skip(1)
         .next()
         .expect("A .obj file to print is required");
-    let (models, _) = tobj::load_obj(&obj_file, true).expect("Failed to load file");
+    let (models, _) = tobj::load_obj(&obj_file, true).unwrap();
 
     app
         .new_window()
@@ -259,7 +259,8 @@ fn render_state(state: &State) -> DynamicImage{
         film_aperture_width, film_aperture_width, image_width,
         image_height, near_clipping_plane, focal_len);
 
-    let mut frame_buffer = vec![Color::new(0.2, 0.2, 0.2); image_width * image_height];
+    let bg_color = Color::new(236.0 / 255.0, 240.0 / 255.0, 241.0 / 255.0);
+    let mut frame_buffer = vec![bg_color; image_width * image_height];
     let mut z_buffer = vec![far_clipping_plane; image_width * image_height];
 
     let start = Instant::now();
@@ -287,7 +288,7 @@ fn render_state(state: &State) -> DynamicImage{
         v1_raster.z = 1.0 / v1_raster.z;
         v2_raster.z = 1.0 / v2_raster.z;
 
-        // Gouraud shading colors
+        // Gouraud shading coloring
         // TODO: the best option would be to compute the normal and v_cam inside the first run...
         let v0_camera = &object_to_camera * &v0;
         let v1_camera = &object_to_camera * &v1;
@@ -298,16 +299,28 @@ fn render_state(state: &State) -> DynamicImage{
             (&light_pos_camera - &v2_camera).normalize(),
         );
         let face_normal_camera = (&((&v1_camera - &v0_camera).cross_product(&(&v2_camera - &v0_camera)))).normalize();
+
+        // Making face culling
+        let v0_view_direction = (-&Vec3::new(v0_camera.x, v0_camera.y, v0_camera.z)).normalize();
+        if v0_view_direction.dot_product(&face_normal_camera) < 0.0 {
+            continue;
+        }
+
         let colors_gouraud = (
             face_normal_camera.dot_product(&light_dirs.0),
             face_normal_camera.dot_product(&light_dirs.1),
             face_normal_camera.dot_product(&light_dirs.2),
         );
 
-        // Making face culling
-        let v0_view_direction = (-&Vec3::new(v0_camera.x, v0_camera.y, v0_camera.z)).normalize();
-        if v0_view_direction.dot_product(&face_normal_camera) < 0.0 {
-            continue;
+        let (mut normal_v0_camera, mut normal_v1_camera, mut normal_v2_camera) = (Vec3::zero(), Vec3::zero(), Vec3::zero());
+        if !state.is_gouraud_shading {
+            let normal_v0 = Vec3::new(model.mesh.normals[idx_1 * 3 + 0], model.mesh.normals[idx_1 * 3 + 1], model.mesh.normals[idx_1 * 3 + 2]);
+            let normal_v1 = Vec3::new(model.mesh.normals[idx_2 * 3 + 0], model.mesh.normals[idx_2 * 3 + 1], model.mesh.normals[idx_2 * 3 + 2]);
+            let normal_v2 = Vec3::new(model.mesh.normals[idx_3 * 3 + 0], model.mesh.normals[idx_3 * 3 + 1], model.mesh.normals[idx_3 * 3 + 2]);
+
+            normal_v0_camera = &object_to_camera * &normal_v0;
+            normal_v1_camera = &object_to_camera * &normal_v1;
+            normal_v2_camera = &object_to_camera * &normal_v2;
         }
 
         // Prepare vertex attributes. Divde them by their vertex z-coordinate
@@ -383,14 +396,16 @@ fn render_state(state: &State) -> DynamicImage{
 
                         let mut color;
                         if state.is_gouraud_shading {
-                            color = colors_gouraud.0 * bar_coords.0 + colors_gouraud.1 * bar_coords.1 + colors_gouraud.2 * bar_coords.2;
+                            color = 0.7 * colors_gouraud.0 * bar_coords.0 + colors_gouraud.1 * bar_coords.1 + colors_gouraud.2 * bar_coords.2;
                         } else {
                             let px = (v0_camera.x / -v0_camera.z) * bar_coords.0 + (v1_camera.x / -v1_camera.z) * bar_coords.1 + (v2_camera.x / -v2_camera.z) * bar_coords.2;
                             let py = (v0_camera.y / -v0_camera.z) * bar_coords.0 + (v1_camera.y / -v1_camera.z) * bar_coords.1 + (v2_camera.y / -v2_camera.z) * bar_coords.2;
                             let pos_camera = Point::new(px * depth, py * depth, -depth); // fragmet position is in the camera space
                             let light_dir = (&light_pos_camera - &pos_camera).normalize();
+                            // let point_normal_camera = normal_v0_camera * bar_coords.0 + normal_v1_camera * bar_coords.1 + normal_v2_camera * bar_coords.2;
+                            let point_normal_camera = (&normal_v0_camera * bar_coords.0  + &normal_v1_camera * bar_coords.1  + &normal_v2_camera * bar_coords.2).normalize();
 
-                            color = face_normal_camera.dot_product(&light_dir);
+                            color = point_normal_camera.dot_product(&light_dir);
                         }
 
                         // // The final color is the reuslt of the faction ration multiplied by the
@@ -400,6 +415,7 @@ fn render_state(state: &State) -> DynamicImage{
                         // let c = if checker { 0.7 } else { 0.3 };
                         // n_dot_view *= c;
 
+                        color += 0.1; // Ambient component
                         frame_buffer[y * image_width + x] = Color::new(color, color, color);
                     }
                 }
@@ -427,7 +443,7 @@ fn render_state(state: &State) -> DynamicImage{
 
 fn init_state(model: Model) -> State {
     println!("Building model!");
-    let distance = -300.0;
+    let distance = -3.0;
 
     let mut object_center = Point::zero();
     for i in 0..((model.mesh.positions.len() / 3) as usize) {
