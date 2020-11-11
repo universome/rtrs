@@ -29,6 +29,7 @@ struct State {
     is_antialiasing: bool,
     specular_lighting_enabled: bool,
     tex_enabled: bool,
+    scroll_speed: f32,
 }
 
 #[derive(Debug, Clone)]
@@ -136,6 +137,20 @@ fn update_on_event(app: &App, state: &mut State, event: Event) {
                     if key == Key::T {
                         state.tex_enabled = !state.tex_enabled;
                     }
+
+                    if key == Key::S {
+                        render_state(state).save("image.tga").unwrap();
+                        println!("Saved the image!");
+                    }
+                },
+                MouseWheel(scroll_delta, _) => {
+                    match scroll_delta {
+                        MouseScrollDelta::PixelDelta(position) => {
+                            state.camera.fov += (position.y as f32) * state.scroll_speed;
+                            state.camera.fov = state.camera.fov.min(PI * 165.0 / 180.0).max(PI * 15.0 / 180.0);
+                        }
+                        _ => {}
+                    }
                 },
                 _ => {}
             }
@@ -182,7 +197,8 @@ fn init_app(app: &App) -> State {
         .build()
         .unwrap();
 
-    let mut state = init_state(models[0].clone());
+    let camera_distance = if obj_file == "resources/KAUST_Beacon.obj" {-1000.0} else {-2.0};
+    let mut state = init_state(models[0].clone(), camera_distance);
 
     (*app.main_window()).set_cursor_position_points(WIDTH as f32 / 2.0, HEIGHT as f32 / 2.0);
     state.curr_mouse_x = app.mouse.x;
@@ -393,15 +409,13 @@ fn render_state(state: &State) -> DynamicImage{
     }
 
     let img = DynamicImage::ImageRgb8(img);
-    // img.save("image.tga").unwrap();
 
     img
 }
 
 
-fn init_state(model: Model) -> State {
+fn init_state(model: Model, camera_distance: f32) -> State {
     println!("Building model!");
-    let distance = -2.0;
 
     let mut object_center = Point::zero();
     for i in 0..((model.mesh.positions.len() / 3) as usize) {
@@ -417,9 +431,9 @@ fn init_state(model: Model) -> State {
 
     State {
         model: model,
-        object_to_world: AffineMat3::translation((&-&(&object_center * 2.5)).into()),
+        object_to_world: AffineMat3::translation((&-&object_center).into()),
         camera: Camera {
-            distance: distance,
+            distance: camera_distance,
             fov: PI * 0.5,
             near_clipping_plane: 1.0,
             far_clipping_plane: 1000.0,
@@ -432,6 +446,7 @@ fn init_state(model: Model) -> State {
         is_antialiasing: false,
         specular_lighting_enabled: false,
         tex_enabled: false,
+        scroll_speed: 0.01,
     }
 }
 
