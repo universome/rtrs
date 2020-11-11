@@ -123,19 +123,19 @@ fn update_on_event(app: &App, state: &mut State, event: Event) {
                 },
                 KeyPressed(key) => {
                     if key == Key::L {
-                        state.is_gouraud_shading = !state.is_gouraud_shading;
+                        state.is_gouraud_shading = !state.is_gouraud_shading || state.model.mesh.normals.is_empty();
                     }
 
                     if key == Key::A {
                         state.is_antialiasing = !state.is_antialiasing;
                     }
 
-                    if key == Key::S {
+                    if key == Key::Q {
                         state.specular_lighting_enabled = !state.specular_lighting_enabled;
                     }
 
                     if key == Key::T {
-                        state.tex_enabled = !state.tex_enabled;
+                        state.tex_enabled = !state.tex_enabled || state.model.mesh.normals.is_empty();
                     }
 
                     if key == Key::S {
