@@ -24,6 +24,7 @@ struct State {
     curr_mouse_x: f32,
     curr_mouse_y: f32,
     object_to_world: AffineMat3,
+    arcball_enabled: bool,
     // is_mouse_inited: bool,
     // curr_mouse_x: f32,
     // curr_mouse_y: f32,
@@ -50,13 +51,15 @@ impl Camera {
 
     fn compute_arcball_vector_for_xy(x: f32, y: f32) -> Vec3 {
         // Computing x, y, in [-1, 1] coords
-        let mut result = Vec3::new(x / WIDTH as f32, y / HEIGHT as f32, 0.0);
-        // result.y = -result.y;
+        // Nannou gives (x, y) coords in [-w/2, w/2] and [-h/2, h/2] formats
+        let mut result = Vec3::new(2.0 * x / WIDTH as f32, 2.0 * y / HEIGHT as f32, 0.0);
 
-        // Normalizing
-        let curr_norm_squared = result.x * result.x + result.y * result.y;
-        if (curr_norm_squared < 1.0) {
-            result.z = (1.0 - curr_norm_squared).sqrt();
+        // Now we pretend that there is a ball which touches (0, 0) point
+        // and which center is located in the object center
+        // We want to project the point back to this sphere
+        let curr_norm = (result.x.powi(2) + result.y.powi(2)).sqrt();
+        if (curr_norm < 1.0) {
+            result.z = (1.0 - curr_norm * curr_norm).sqrt();
         } else {
             result = result.normalize();
         }
@@ -99,22 +102,23 @@ fn compute_screen_coordinates(
 
 
 fn convert_to_raster(
-    vertex: &Point, object_to_camera: &AffineMat3, l: f32, r: f32, t: f32, b: f32,
+    vertex_obj: &Point, object_to_camera: &AffineMat3, l: f32, r: f32, t: f32, b: f32,
     near: f32, image_width: usize, image_height: usize) -> Point {
 
-    let mut result = object_to_camera * vertex;
+    // To camera space
+    let mut result = object_to_camera * vertex_obj;
 
-    // convert to screen space
+    // To clip space
+    // 1. Apply perspective
     result.x = near * result.x / -result.z;
     result.y = near * result.y / -result.z;
-
-    // now convert point from screen space to NDC space (in range [-1,1])
+    // 2.  Convert to [-1, 1]
     result.x = 2.0 * result.x / (r - l) - (r + l) / (r - l);
     result.y = 2.0 * result.y / (t - b) - (t + b) / (t - b);
 
-    // convert to raster space
+    // To screen space, i.e [0, w] and [0, h]
     result.x = (result.x + 1.0) * 0.5 * (image_width as f32);
-    result.y = (1.0 - result.y) * 0.5 * (image_height as f32); // in raster space y is down so invert direction
+    result.y = (1.0 - result.y) * 0.5 * (image_height as f32);
     result.z = -result.z;
 
     result
@@ -127,36 +131,56 @@ pub fn launch() {
 
 
 fn update_on_event(app: &App, state: &mut State, event: Event) {
-    if (state.curr_mouse_x == app.mouse.x && state.curr_mouse_y == app.mouse.y) {
-        println!("Mouse is not updated...");
+    match event {
+        Event::WindowEvent {id: _, simple: window_event } => {
+            if window_event.is_none() {
+                return;
+            }
+
+            match window_event.unwrap() {
+                MousePressed(button) => {
+                    if button != MouseButton::Left {
+                        return;
+                    }
+
+                    state.arcball_enabled = true;
+                    state.curr_mouse_x = app.mouse.x;
+                    state.curr_mouse_y = app.mouse.y;
+                },
+                MouseReleased(button) => {
+                    if button != MouseButton::Left {
+                        return;
+                    }
+
+                    state.arcball_enabled = false;
+                },
+                _ => {}
+            }
+        },
+        _ => {},
+    }
+
+    if (!state.arcball_enabled) {
         return;
     }
-    println!("Mouse pos: {} {} {} {}", state.curr_mouse_x, state.curr_mouse_y, app.mouse.x, app.mouse.y);
+
+    if (state.curr_mouse_x == app.mouse.x && state.curr_mouse_y == app.mouse.y) {
+        return;
+    }
+    // println!("Mouse pos: {} {} {} {}", state.curr_mouse_x, state.curr_mouse_y, app.mouse.x, app.mouse.y);
     let prev_arcball_vec = Camera::compute_arcball_vector_for_xy(state.curr_mouse_x, state.curr_mouse_y);
     let curr_arcball_vec = Camera::compute_arcball_vector_for_xy(app.mouse.x, app.mouse.y);
-    let angle = prev_arcball_vec.dot_product(&curr_arcball_vec).min(1.0).acos();
+    let angle = 2.0 * prev_arcball_vec.dot_product(&curr_arcball_vec).min(1.0).acos();
     let world_to_camera = state.camera.compute_view_matrix();
-    let object_to_camera = &state.object_to_world * &world_to_camera;
-    let camera_to_object = &object_to_camera.compute_inverse();
-    // let axis_camera = &prev_arcball_vec.cross_product(&curr_arcball_vec);
-    let axis_camera = &curr_arcball_vec.cross_product(&prev_arcball_vec);
-    let axis_obj = (camera_to_object * axis_camera).normalize();
-    // let rotation = Matrix4::new_rotation_wrt_point(&axis_obj * angle, Point3::new(0.0, 0.0, 0.0));
-    let rotation = AffineMat3::rotation(angle, &axis_obj);
+    // let object_to_camera = &world_to_camera * &state.object_translation;
+    // let camera_to_object = &world_to_camera.compute_inverse();
+    let camera_to_world = &world_to_camera.compute_inverse();
+    let axis_camera = &prev_arcball_vec.cross_product(&curr_arcball_vec);
+    // let axis_camera = &curr_arcball_vec.cross_product(&prev_arcball_vec);
+    let axis_world = (camera_to_world * axis_camera).normalize();
+    let rotation = AffineMat3::rotation(angle, &axis_world);
 
-    // println!("prev_arcball_vec: {:?}", &prev_arcball_vec);
-    // println!("curr_arcball_vec: {:?}", &curr_arcball_vec);
-    // println!("axis_camera: {:?}", &axis_camera);
-    // println!("axis_obj: {:?}", &axis_obj);
-    // println!("angle: {:?}", &angle);
-    // println!("rotation: {:?}", &rotation);
-    // Matrix4::look_at_rh(&self.eye, &self.look_at, &self.up)
-    // println!("My: {}", &rotation);
-    // println!("Theirs: {}", Matrix4::new_rotation_wrt_point(
-    //     &Vector3::new(axis_obj.x, axis_obj.y, axis_obj.z) * angle,
-    //     Point3::new(0.0, 0.0, 0.0),
-    // ));
-
+    // state.object_rotation = &rotation * &state.object_rotation;
     state.object_to_world = &rotation * &state.object_to_world;
     state.curr_mouse_x = app.mouse.x;
     state.curr_mouse_y = app.mouse.y;
@@ -227,7 +251,7 @@ fn render_state(state: &State) -> DynamicImage{
     //     0.0, 0.0, 0.0, 1.0
     // );
     let world_to_camera = state.camera.compute_view_matrix();
-    let object_to_camera = &state.object_to_world * &world_to_camera;
+    let object_to_camera = &world_to_camera * &state.object_to_world;
     let camera_to_object = object_to_camera.compute_inverse();
     // let image_width: usize = 1280;
     // let image_height: usize = 960;
@@ -261,9 +285,9 @@ fn render_state(state: &State) -> DynamicImage{
         let v2 = Point::new(model.mesh.positions[idx_3 * 3 + 0], model.mesh.positions[idx_3 * 3 + 1], model.mesh.positions[idx_3 * 3 + 2]);
 
         // Convert the vertices of the triangle to raster space
-        let mut v0_raster = convert_to_raster(&v0, &camera_to_object, l, r, t, b, near_clipping_plane, image_width, image_height);
-        let mut v1_raster = convert_to_raster(&v1, &camera_to_object, l, r, t, b, near_clipping_plane, image_width, image_height);
-        let mut v2_raster = convert_to_raster(&v2, &camera_to_object, l, r, t, b, near_clipping_plane, image_width, image_height);
+        let mut v0_raster = convert_to_raster(&v0, &object_to_camera, l, r, t, b, near_clipping_plane, image_width, image_height);
+        let mut v1_raster = convert_to_raster(&v1, &object_to_camera, l, r, t, b, near_clipping_plane, image_width, image_height);
+        let mut v2_raster = convert_to_raster(&v2, &object_to_camera, l, r, t, b, near_clipping_plane, image_width, image_height);
 
         // Precompute reciprocal of vertex z-coordinate
         v0_raster.z = 1.0 / v0_raster.z;
@@ -398,11 +422,26 @@ fn render_state(state: &State) -> DynamicImage{
 
 fn init_state(model: Model) -> State {
     println!("Building model!");
-    let distance = 100.0;
+    let distance = -30.0;
+
+    let mut object_center = Point::zero();
+    for i in 0..((model.mesh.positions.len() / 3) as usize) {
+        object_center.x += model.mesh.positions[i * 3 + 0] * (1.0 / model.mesh.positions.len() as f32);
+        object_center.y += model.mesh.positions[i * 3 + 1] * (1.0 / model.mesh.positions.len() as f32);
+        object_center.z += model.mesh.positions[i * 3 + 2] * (1.0 / model.mesh.positions.len() as f32);
+    }
+
+    println!("Object center: {:?}", &object_center);
 
     State {
         model: model,
-        object_to_world: AffineMat3::identity(),
+        // object_to_world: AffineMat3::translation(Vec3::new(0.0, -5.0, 0.0)),
+        // object_to_world: AffineMat3::identity(),
+        // object_to_world: AffineMat3::translation((&-&(&object_center * 2.5)).into()),
+        // object_to_world: &AffineMat3::rotation(1.57, &Vec3::new(0.0, 1.0, 0.0)) * &AffineMat3::translation(((&-&object_center).into())),
+        object_to_world: AffineMat3::translation((&-&(&object_center * 2.5)).into()),
+        // object_rotation: AffineMat3::identity(),
+        // object_to_world: AffineMat3::rotation(1.57, &Vec3::new(0.0, 1.0, 0.0)),
         camera: Camera {
             distance: distance,
             eye: Point::new(0.0, 0.0, -distance),
@@ -411,6 +450,7 @@ fn init_state(model: Model) -> State {
         },
         curr_mouse_x: 0.0,
         curr_mouse_y: 0.0,
+        arcball_enabled: false,
     }
 }
 

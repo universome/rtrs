@@ -163,7 +163,24 @@ impl Point {
     pub fn new(x: f32, y: f32, z: f32) -> Self {
         Point {x: x, y: y, z: z}
     }
+
+    pub fn zero() -> Self {
+        Point {x: 0.0, y: 0.0, z: 0.0}
+    }
 }
+
+impl ops::Mul<f32> for &Point {
+    type Output = Point;
+
+    fn mul(self, scalar: f32) -> Point {
+        Point {
+            x: self.x * scalar,
+            y: self.y * scalar,
+            z: self.z * scalar,
+        }
+    }
+}
+
 
 impl ops::Sub<&Point> for &Point {
     type Output = Vec3;
