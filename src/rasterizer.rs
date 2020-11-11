@@ -31,6 +31,7 @@ struct State {
     is_gouraud_shading: bool,
     is_antialiasing: bool,
     specular_lighting_enabled: bool,
+    tex_enabled: bool
 }
 
 struct Camera {
@@ -162,6 +163,10 @@ fn update_on_event(app: &App, state: &mut State, event: Event) {
 
                     if key == Key::S {
                         state.specular_lighting_enabled = !state.specular_lighting_enabled;
+                    }
+
+                    if key == Key::T {
+                        state.tex_enabled = !state.tex_enabled;
                     }
                 },
                 _ => {}
@@ -332,25 +337,14 @@ fn render_state(state: &State) -> DynamicImage{
 
         // Prepare vertex attributes. Divde them by their vertex z-coordinate
         // (though we use a multiplication here because v.z = 1 / v.z)
-        let mut st0;
-        let mut st1;
-        let mut st2;
+        let mut st0 = (0.0, 0.0);
+        let mut st1 = (0.0, 0.0);
+        let mut st2 = (0.0, 0.0);
 
-        if tex.is_empty() {
-            st0 = (0.0, 0.0);
-            st1 = (0.0, 0.0);
-            st2 = (0.0, 0.0);
-        } else {
-            st0 = (tex[idx_1 * 2], tex[idx_1 * 2 + 1]);
-            st1 = (tex[idx_2 * 2], tex[idx_2 * 2 + 1]);
-            st2 = (tex[idx_3 * 2], tex[idx_3 * 2 + 1]);
-
-            st0.0 *= v0_raster.z;
-            st0.1 *= v0_raster.z;
-            st1.0 *= v1_raster.z;
-            st1.1 *= v1_raster.z;
-            st2.0 *= v2_raster.z;
-            st2.1 *= v2_raster.z;
+        if !tex.is_empty() && state.tex_enabled {
+            st0 = (tex[idx_1 * 2] * v0_raster.z, tex[idx_1 * 2 + 1] * v0_raster.z);
+            st1 = (tex[idx_2 * 2] * v1_raster.z, tex[idx_2 * 2 + 1] * v1_raster.z);
+            st2 = (tex[idx_3 * 2] * v2_raster.z, tex[idx_3 * 2 + 1] * v2_raster.z);
         }
 
         let x_min = min_of_three(v0_raster.x, v1_raster.x, v2_raster.x);
@@ -388,16 +382,11 @@ fn render_state(state: &State) -> DynamicImage{
                     if (depth < z_buffer[y * frame_width + x]) {
                         z_buffer[y * frame_width + x] = depth;
 
-                        // let tex_coords = (
-                        //     (st0.0 * bar_coords.0 + st1.0 * bar_coords.1 + st2.0 * bar_coords.2) * depth,
-                        //     (st0.1 * bar_coords.0 + st1.1 * bar_coords.1 + st2.1 * bar_coords.2) * depth
-                        // );
+                        let mut color = 0.1; // Ambient strength
 
-                        let mut color;
-                        let ambient_strength = 0.1;
                         if state.is_gouraud_shading {
                             let diffuse_strength = 0.7 * colors_gouraud.0 * bar_coords.0 + colors_gouraud.1 * bar_coords.1 + colors_gouraud.2 * bar_coords.2;
-                            color = ambient_strength + diffuse_strength;
+                            color += diffuse_strength;
 
                             if state.specular_lighting_enabled {
                                 color += gouraud_speculars.0 * bar_coords.0 + gouraud_speculars.1 * bar_coords.1 + gouraud_speculars.2 * bar_coords.2;
@@ -410,17 +399,22 @@ fn render_state(state: &State) -> DynamicImage{
                             // let point_normal_camera = normal_v0_camera * bar_coords.0 + normal_v1_camera * bar_coords.1 + normal_v2_camera * bar_coords.2;
                             let point_normal_camera = (&normal_v0_camera * bar_coords.0  + &normal_v1_camera * bar_coords.1  + &normal_v2_camera * bar_coords.2).normalize();
                             let diffuse_strength = point_normal_camera.dot_product(&light_dir);
-                            color = ambient_strength + diffuse_strength;
+                            color += diffuse_strength;
 
                             if (state.specular_lighting_enabled) {
                                 let view_direction = (-&Vec3::new(pos_camera.x, pos_camera.y, pos_camera.z)).normalize();
-                                // let normal_dot_light = point_normal_camera.dot_product(&light_dir).max(0.0);
-                                // let reflect_dir = &(&-&light_dir + &(&point_normal_camera * (2.0 * normal_dot_light)));
-                                // let reflect_dot_view = view_direction.dot_product(&reflect_dir).max(0.0);
 
-                                // color = color + 0.5 * reflect_dot_view.powi(32);
                                 color += compute_specular(&point_normal_camera, &view_direction, &light_dir);
                             }
+                        }
+
+                        if !tex.is_empty() && state.tex_enabled {
+                            let tex_coords = (
+                                (st0.0 * bar_coords.0 + st1.0 * bar_coords.1 + st2.0 * bar_coords.2) * depth,
+                                (st0.1 * bar_coords.0 + st1.1 * bar_coords.1 + st2.1 * bar_coords.2) * depth,
+                            );
+
+                            color += compute_stripe_color(tex_coords.0, tex_coords.1);
                         }
 
                         frame_buffer[y * frame_width + x] = Color::new(color, color, color);
@@ -491,6 +485,7 @@ fn init_state(model: Model) -> State {
         is_gouraud_shading: true,
         is_antialiasing: false,
         specular_lighting_enabled: false,
+        tex_enabled: false,
     }
 }
 
@@ -527,4 +522,22 @@ fn compute_specular(normal: &Vec3, view_dir: &Vec3, light_dir: &Vec3) -> f32 {
     let reflect_dot_view = view_dir.dot_product(&reflect_dir).max(0.0);
 
     0.5 * reflect_dot_view.powi(32)
+}
+
+#[inline]
+fn compute_stripe_color(s: f32, t: f32) -> f32 {
+    let stripes_fuzz = 0.1;
+    let stripes_width = 0.5;
+    let stripes_scale = 20.0;
+
+    let scaled_t = (t * stripes_scale) % 1.0; // Split into 10 stripes
+    let step_1 = (scaled_t / stripes_fuzz).min(1.0).max(0.0);
+    let step_2 = ((scaled_t - stripes_width) / stripes_fuzz).min(1.0).max(0.0);
+    let step_3 = step_1 * (1.0 - step_2);
+    let step_4 = step_3 * step_3 * (3.0 - (2.0 * step_3));
+
+    let back_color = 0.0;
+    let stripe_color = 0.7;
+
+    back_color * step_1 + (1.0 - step_1) * stripe_color
 }
