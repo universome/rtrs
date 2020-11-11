@@ -17,6 +17,8 @@ const inch_to_mm: f32 = 25.4;
 // const HEIGHT: usize = 120;
 const WIDTH: usize = 640;
 const HEIGHT: usize = 480;
+// const WIDTH: usize = 1280;
+// const HEIGHT: usize = 960;
 
 struct State {
     model: Model,
@@ -26,6 +28,7 @@ struct State {
     object_to_world: AffineMat3,
     arcball_enabled: bool,
     light_position: Point,
+    is_gouraud_shading: bool,
 }
 
 struct Camera {
@@ -145,6 +148,11 @@ fn update_on_event(app: &App, state: &mut State, event: Event) {
                     }
 
                     state.arcball_enabled = false;
+                },
+                KeyPressed(key) => {
+                    if key == Key::L {
+                        state.is_gouraud_shading = !state.is_gouraud_shading;
+                    }
                 },
                 _ => {}
             }
@@ -269,22 +277,6 @@ fn render_state(state: &State) -> DynamicImage{
         let v1 = Point::new(model.mesh.positions[idx_2 * 3 + 0], model.mesh.positions[idx_2 * 3 + 1], model.mesh.positions[idx_2 * 3 + 2]);
         let v2 = Point::new(model.mesh.positions[idx_3 * 3 + 0], model.mesh.positions[idx_3 * 3 + 1], model.mesh.positions[idx_3 * 3 + 2]);
 
-        // TODO: the best option would be to compute the normal and v_cam inside the first run...
-        let v0_camera = &object_to_camera * &v0;
-        let v1_camera = &object_to_camera * &v1;
-        let v2_camera = &object_to_camera * &v2;
-        let normal_camera = (&((&v1_camera - &v0_camera).cross_product(&(&v2_camera - &v0_camera)))).normalize();
-        let light_dirs = (
-            (&light_pos_camera - &v0_camera).normalize(),
-            (&light_pos_camera - &v1_camera).normalize(),
-            (&light_pos_camera - &v2_camera).normalize(),
-        );
-        let colors_gouraud = (
-            normal_camera.dot_product(&light_dirs.0),
-            normal_camera.dot_product(&light_dirs.1),
-            normal_camera.dot_product(&light_dirs.2),
-        );
-
         // Convert the vertices of the triangle to raster space
         let mut v0_raster = convert_to_raster(&v0, &object_to_camera, l, r, t, b, near_clipping_plane, image_width, image_height);
         let mut v1_raster = convert_to_raster(&v1, &object_to_camera, l, r, t, b, near_clipping_plane, image_width, image_height);
@@ -294,6 +286,29 @@ fn render_state(state: &State) -> DynamicImage{
         v0_raster.z = 1.0 / v0_raster.z;
         v1_raster.z = 1.0 / v1_raster.z;
         v2_raster.z = 1.0 / v2_raster.z;
+
+        // Gouraud shading colors
+        // TODO: the best option would be to compute the normal and v_cam inside the first run...
+        let v0_camera = &object_to_camera * &v0;
+        let v1_camera = &object_to_camera * &v1;
+        let v2_camera = &object_to_camera * &v2;
+        let light_dirs = (
+            (&light_pos_camera - &v0_camera).normalize(),
+            (&light_pos_camera - &v1_camera).normalize(),
+            (&light_pos_camera - &v2_camera).normalize(),
+        );
+        let face_normal_camera = (&((&v1_camera - &v0_camera).cross_product(&(&v2_camera - &v0_camera)))).normalize();
+        let colors_gouraud = (
+            face_normal_camera.dot_product(&light_dirs.0),
+            face_normal_camera.dot_product(&light_dirs.1),
+            face_normal_camera.dot_product(&light_dirs.2),
+        );
+
+        // Making face culling
+        let v0_view_direction = (-&Vec3::new(v0_camera.x, v0_camera.y, v0_camera.z)).normalize();
+        if v0_view_direction.dot_product(&face_normal_camera) < 0.0 {
+            continue;
+        }
 
         // Prepare vertex attributes. Divde them by their vertex z-coordinate
         // (though we use a multiplication here because v.z = 1 / v.z)
@@ -359,16 +374,24 @@ fn render_state(state: &State) -> DynamicImage{
                         //     (st0.1 * bar_coords.0 + st1.1 * bar_coords.1 + st2.1 * bar_coords.2) * depth
                         // );
 
-                        // let px = (v0_camera.x / -v0_camera.z) * bar_coords.0 + (v1_camera.x / -v1_camera.z) * bar_coords.1 + (v2_camera.x / -v2_camera.z) * bar_coords.2;
-                        // let py = (v0_camera.y / -v0_camera.z) * bar_coords.0 + (v1_camera.y / -v1_camera.z) * bar_coords.1 + (v2_camera.y / -v2_camera.z) * bar_coords.2;
-                        // let pos_camera = Point::new(px * depth, py * depth, -depth); // fragmet position is in the camera space
-
                         // Compute the face normal which is used for a simple facing ratio.
                         // Keep in mind that we are doing all calculation in camera space.
                         // Thus the view direction can be computed as the point on the object
                         // in camera space minus Vec3f(0), the position of the camera in camera space.
                         // let view_direction = (-&Vec3::new(pos_camera.x, pos_camera.y, pos_camera.z)).normalize();
-                        // let mut n_dot_view = normal_camera.dot_product(&view_direction).max(0.0);
+                        // let mut n_dot_view = face_normal_camera.dot_product(&view_direction).max(0.0);
+
+                        let mut color;
+                        if state.is_gouraud_shading {
+                            color = colors_gouraud.0 * bar_coords.0 + colors_gouraud.1 * bar_coords.1 + colors_gouraud.2 * bar_coords.2;
+                        } else {
+                            let px = (v0_camera.x / -v0_camera.z) * bar_coords.0 + (v1_camera.x / -v1_camera.z) * bar_coords.1 + (v2_camera.x / -v2_camera.z) * bar_coords.2;
+                            let py = (v0_camera.y / -v0_camera.z) * bar_coords.0 + (v1_camera.y / -v1_camera.z) * bar_coords.1 + (v2_camera.y / -v2_camera.z) * bar_coords.2;
+                            let pos_camera = Point::new(px * depth, py * depth, -depth); // fragmet position is in the camera space
+                            let light_dir = (&light_pos_camera - &pos_camera).normalize();
+
+                            color = face_normal_camera.dot_product(&light_dir);
+                        }
 
                         // // The final color is the reuslt of the faction ration multiplied by the
                         // // checkerboard pattern.
@@ -376,7 +399,6 @@ fn render_state(state: &State) -> DynamicImage{
                         // let checker = (((tex_coords.0 * M) % 1.0) > 0.5) ^ (((tex_coords.1 * M) % 1.0) < 0.5);
                         // let c = if checker { 0.7 } else { 0.3 };
                         // n_dot_view *= c;
-                        let color = colors_gouraud.0 * bar_coords.0 + colors_gouraud.1 * bar_coords.1 + colors_gouraud.2 * bar_coords.2;
 
                         frame_buffer[y * image_width + x] = Color::new(color, color, color);
                     }
@@ -386,7 +408,7 @@ fn render_state(state: &State) -> DynamicImage{
     }
 
     let duration = start.elapsed();
-    // println!("Rasterizer done! Took time: {} ms", duration.as_millis());
+    println!("Rasterizer done! Took time: {} ms", duration.as_millis());
     // println!("Preparation time took: {} ms", preparation_time.as_millis());
 
     let mut img = RgbImage::new(image_width as u32, image_height as u32);
@@ -405,7 +427,7 @@ fn render_state(state: &State) -> DynamicImage{
 
 fn init_state(model: Model) -> State {
     println!("Building model!");
-    let distance = -30.0;
+    let distance = -300.0;
 
     let mut object_center = Point::zero();
     for i in 0..((model.mesh.positions.len() / 3) as usize) {
@@ -415,6 +437,9 @@ fn init_state(model: Model) -> State {
     }
 
     println!("Object center: {:?}", &object_center);
+    println!("Number of vertices: {}", model.mesh.positions.len() / 3);
+    println!("Number of normals: {}", model.mesh.normals.len() / 3);
+    println!("Number of texcoords: {}", model.mesh.texcoords.len() / 2);
 
     State {
         model: model,
@@ -429,6 +454,7 @@ fn init_state(model: Model) -> State {
         curr_mouse_y: 0.0,
         arcball_enabled: false,
         light_position: Point::new(0.0, 100.0, 0.0),
+        is_gouraud_shading: true,
     }
 }
 

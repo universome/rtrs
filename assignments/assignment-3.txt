@@ -29,7 +29,7 @@ Ideas for additional points:
 - Implement Phong shading.
 - Box filtering with superresolution (supersampling?) for antialiasing (with a key control to enable/disable it)
 - Parallelization?
-- Face culling
+- Face culling (gave 2x speedup for KAUST beacon)
 - Ticker that shows FPS
 
 Fun assignment: Find out what is written on the bottom of the model. Send me a screenshot to prove that it has been read by using your own renderer.
