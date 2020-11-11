@@ -1,25 +1,22 @@
 use std::time::{Instant, Duration};
-use std::cmp;
 use std::f32::consts::{PI};
+use std::cmp;
 use std::env;
 
-use nalgebra::{Matrix4, Vector3, Point3};
+// use nalgebra::{Matrix4, Vector3, Point3};
 use nannou::prelude::*;
 use nannou::image::{DynamicImage, RgbImage};
 use tobj::{Model};
 
-// use crate::mesh::{Triangle};
 use crate::matrix::*;
 use crate::basics::*;
 
-const inch_to_mm: f32 = 25.4;
-// const WIDTH: usize = 160;
-// const HEIGHT: usize = 120;
-const WIDTH: usize = 640;
-const HEIGHT: usize = 480;
-// const WIDTH: usize = 1280;
-// const HEIGHT: usize = 960;
+// const WIDTH: usize = 640;
+// const HEIGHT: usize = 480;
+const WIDTH: usize = 1280;
+const HEIGHT: usize = 960;
 
+#[derive(Debug, Clone)]
 struct State {
     model: Model,
     camera: Camera,
@@ -31,20 +28,34 @@ struct State {
     is_gouraud_shading: bool,
     is_antialiasing: bool,
     specular_lighting_enabled: bool,
-    tex_enabled: bool
+    tex_enabled: bool,
 }
 
+#[derive(Debug, Clone)]
 struct Camera {
-    pub distance: f32, // Determines the ball radius for arcball
-    pub eye: Point,
-    pub look_at: Point,
-    pub up: Vec3,
+    pub distance: f32, // Camera distance
+    pub fov: f32,
+    pub near_clipping_plane: f32,
+    pub far_clipping_plane: f32,
+}
+
+#[derive(Debug, Clone)]
+struct ViewingPlane {
+    pub z: f32,
+    pub x_min: f32,
+    pub x_max: f32,
+    pub y_min: f32,
+    pub y_max: f32,
 }
 
 
 impl Camera {
     fn compute_view_matrix(&self) -> AffineMat3 {
-        AffineMat3::new_view_matrix(&self.eye, &self.look_at, &self.up)
+        let eye = Point::new(0.0, 0.0, -self.distance);
+        let look_at = Point::new(0.0, 0.0, -self.distance - 1.0);
+        let up = Vec3::new(0.0, 1.0, 0.0);
+
+        AffineMat3::new_view_matrix(&eye, &look_at, &up)
     }
 
     fn compute_arcball_vector_for_xy(x: f32, y: f32) -> Vec3 {
@@ -56,7 +67,7 @@ impl Camera {
         // and which center is located in the object center
         // We want to project the point back to this sphere
         let curr_norm = (result.x.powi(2) + result.y.powi(2)).sqrt();
-        if (curr_norm < 1.0) {
+        if curr_norm < 1.0 {
             result.z = (1.0 - curr_norm * curr_norm).sqrt();
         } else {
             result = result.normalize();
@@ -64,62 +75,19 @@ impl Camera {
 
         result
     }
-}
 
+    pub fn compute_viewing_plane(&self, frame_width: usize, frame_height: usize) -> ViewingPlane {
+        let y_half = (self.fov * 0.5).tanh();
+        let x_half = y_half * (frame_width as f32) / (frame_height as f32);
 
-fn compute_screen_coordinates(
-    film_aperture_width: f32, film_aperture_height: f32,
-    frame_width: usize, frame_height: usize, near_clipping_plane: f32, focal_len: f32) -> (f32, f32, f32, f32) {
-
-    let film_aspect_ratio = film_aperture_width / film_aperture_height;
-    let device_aspect_ratio = frame_width as f32 / frame_height as f32;
-
-    let mut top = ((film_aperture_height * inch_to_mm / 2.0) / focal_len) * near_clipping_plane;
-    let mut right = ((film_aperture_width * inch_to_mm / 2.0) / focal_len) * near_clipping_plane;
-
-    // field of view (horizontal)
-    let fov = 2.0 * 180.0 / PI * ((film_aperture_width * inch_to_mm / 2.0) / focal_len).atan();
-
-    let mut xscale = 1.0;
-    let mut yscale = 1.0;
-
-    if (film_aspect_ratio > device_aspect_ratio) {
-        yscale = film_aspect_ratio / device_aspect_ratio;
-    } else {
-        xscale = device_aspect_ratio / film_aspect_ratio;
+        ViewingPlane {
+            z: self.distance + self.near_clipping_plane / (self.fov * 0.5).tanh(),
+            x_min: -x_half,
+            x_max: x_half,
+            y_min: -y_half,
+            y_max: y_half,
+        }
     }
-
-    right *= xscale;
-    top *= yscale;
-
-    let bottom = -top;
-    let left = -right;
-
-    (top, bottom, left, right)
-}
-
-
-fn convert_to_raster(
-    vertex_obj: &Point, object_to_camera: &AffineMat3, l: f32, r: f32, t: f32, b: f32,
-    near: f32, frame_width: usize, frame_height: usize) -> Point {
-
-    // To camera space
-    let mut result = object_to_camera * vertex_obj;
-
-    // To clip space
-    // 1. Apply perspective
-    result.x = near * result.x / -result.z;
-    result.y = near * result.y / -result.z;
-    // 2.  Convert to [-1, 1]
-    result.x = 2.0 * result.x / (r - l) - (r + l) / (r - l);
-    result.y = 2.0 * result.y / (t - b) - (t + b) / (t - b);
-
-    // To screen space, i.e [0, w] and [0, h]
-    result.x = (result.x + 1.0) * 0.5 * (frame_width as f32);
-    result.y = (1.0 - result.y) * 0.5 * (frame_height as f32);
-    result.z = -result.z;
-
-    result
 }
 
 
@@ -175,11 +143,11 @@ fn update_on_event(app: &App, state: &mut State, event: Event) {
         _ => {},
     }
 
-    if (!state.arcball_enabled) {
+    if !state.arcball_enabled {
         return;
     }
 
-    if (state.curr_mouse_x == app.mouse.x && state.curr_mouse_y == app.mouse.y) {
+    if state.curr_mouse_x == app.mouse.x && state.curr_mouse_y == app.mouse.y {
         return;
     }
 
@@ -187,11 +155,10 @@ fn update_on_event(app: &App, state: &mut State, event: Event) {
     let curr_arcball_vec = Camera::compute_arcball_vector_for_xy(app.mouse.x, app.mouse.y);
     let angle = 2.0 * prev_arcball_vec.dot_product(&curr_arcball_vec).min(1.0).acos();
     let world_to_camera = state.camera.compute_view_matrix();
-    let object_to_camera = &world_to_camera * &state.object_to_world;
-    let camera_to_object = &world_to_camera.compute_inverse();
+    let camera_to_world = &world_to_camera.compute_inverse();
     let axis_camera = &prev_arcball_vec.cross_product(&curr_arcball_vec);
-    let axis_object = (camera_to_object * axis_camera).normalize();
-    let rotation = AffineMat3::rotation(angle, &axis_object);
+    let axis_world = (camera_to_world * axis_camera).normalize();
+    let rotation = AffineMat3::rotation(angle, &axis_world);
 
     // state.object_rotation = &rotation * &state.object_rotation;
     state.object_to_world = &rotation * &state.object_to_world;
@@ -217,13 +184,9 @@ fn init_app(app: &App) -> State {
 
     let mut state = init_state(models[0].clone());
 
-    println!("Mouse pos before: {} {} {} {}", state.curr_mouse_x, state.curr_mouse_y, app.mouse.x, app.mouse.y);
-
     (*app.main_window()).set_cursor_position_points(WIDTH as f32 / 2.0, HEIGHT as f32 / 2.0);
     state.curr_mouse_x = app.mouse.x;
     state.curr_mouse_y = app.mouse.y;
-
-    println!("Mouse pos after: {} {} {} {}", state.curr_mouse_x, state.curr_mouse_y, app.mouse.x, app.mouse.y);
 
     state
 }
@@ -245,34 +208,19 @@ fn render_state(state: &State) -> DynamicImage{
     let model = &state.model;
     let num_triangles = model.mesh.num_face_indices.len();
     let tex = &model.mesh.texcoords;
-    let near_clipping_plane = 1.0;
-    let far_clipping_plane = 1000.0;
-    let focal_len = 20.0; // in mm
-    let film_aperture_width = 0.980; // 35mm Full Aperture in inches
-    let film_aperture_width = 0.735;
-
     let world_to_camera = state.camera.compute_view_matrix();
     let object_to_camera = &world_to_camera * &state.object_to_world;
     let light_pos_camera = &world_to_camera * &state.light_position;
-    let camera_to_object = object_to_camera.compute_inverse();
     let frame_width: usize = if state.is_antialiasing {WIDTH * 2} else {WIDTH};
     let frame_height: usize = if state.is_antialiasing {HEIGHT * 2} else {HEIGHT};
-
-    let (t, b, l, r) = compute_screen_coordinates(
-        film_aperture_width, film_aperture_width, frame_width,
-        frame_height, near_clipping_plane, focal_len);
-
+    let viewing_plane = state.camera.compute_viewing_plane(frame_width, frame_height);
     let bg_color = Color::new(236.0 / 255.0, 240.0 / 255.0, 241.0 / 255.0);
     let mut frame_buffer = vec![bg_color; frame_width * frame_height];
-    let mut z_buffer = vec![far_clipping_plane; frame_width * frame_height];
+    let mut z_buffer = vec![state.camera.far_clipping_plane; frame_width * frame_height];
 
     let start = Instant::now();
-    let mut preparation_time = Duration::from_secs(0);
-    let mut inner_loop_time = Duration::from_secs(0);
 
     for i in 0..(num_triangles as usize) {
-        let preparation_start = Instant::now();
-
         let idx_1 = model.mesh.indices[i * 3 + 0] as usize;
         let idx_2 = model.mesh.indices[i * 3 + 1] as usize;
         let idx_3 = model.mesh.indices[i * 3 + 2] as usize;
@@ -282,9 +230,9 @@ fn render_state(state: &State) -> DynamicImage{
         let v2 = Point::new(model.mesh.positions[idx_3 * 3 + 0], model.mesh.positions[idx_3 * 3 + 1], model.mesh.positions[idx_3 * 3 + 2]);
 
         // Convert the vertices of the triangle to raster space
-        let mut v0_raster = convert_to_raster(&v0, &object_to_camera, l, r, t, b, near_clipping_plane, frame_width, frame_height);
-        let mut v1_raster = convert_to_raster(&v1, &object_to_camera, l, r, t, b, near_clipping_plane, frame_width, frame_height);
-        let mut v2_raster = convert_to_raster(&v2, &object_to_camera, l, r, t, b, near_clipping_plane, frame_width, frame_height);
+        let mut v0_raster = convert_to_raster(&v0, &object_to_camera, &state.camera, &viewing_plane, frame_width, frame_height);
+        let mut v1_raster = convert_to_raster(&v1, &object_to_camera, &state.camera, &viewing_plane, frame_width, frame_height);
+        let mut v2_raster = convert_to_raster(&v2, &object_to_camera, &state.camera, &viewing_plane, frame_width, frame_height);
 
         // Precompute reciprocal of vertex z-coordinate
         v0_raster.z = 1.0 / v0_raster.z;
@@ -303,7 +251,7 @@ fn render_state(state: &State) -> DynamicImage{
         );
         let face_normal_camera = (&((&v1_camera - &v0_camera).cross_product(&(&v2_camera - &v0_camera)))).normalize();
 
-        // Making face culling
+        // Making backface culling
         let v0_view_direction = (-&Vec3::new(v0_camera.x, v0_camera.y, v0_camera.z)).normalize();
         if v0_view_direction.dot_product(&face_normal_camera) < 0.0 {
             continue;
@@ -353,19 +301,17 @@ fn render_state(state: &State) -> DynamicImage{
         let y_max = max_of_three(v0_raster.y, v1_raster.y, v2_raster.y);
 
         // the triangle is out of screen
-        if (x_min > (frame_width - 1) as f32 || x_max < 0.0 || y_min > (frame_height - 1) as f32 || y_max < 0.0) {
+        if x_min > (frame_width - 1) as f32 || x_max < 0.0 || y_min > (frame_height - 1) as f32 || y_max < 0.0 {
             continue;
         }
 
         // be careful x_min/x_max/y_min/y_max can be negative. Don't cast to uint32_t
-        let x0 = cmp::max(0, (x_min.floor() as i32)) as usize;
-        let x1 = cmp::min(frame_width as i32 - 1, (x_max.floor() as i32)) as usize;
-        let y0 = cmp::max(0, (y_min.floor() as i32)) as usize;
-        let y1 = cmp::min(frame_height as i32 - 1, (y_max.floor() as i32)) as usize;
+        let x0 = cmp::max(0, x_min.floor() as i32) as usize;
+        let x1 = cmp::min(frame_width as i32 - 1, x_max.floor() as i32) as usize;
+        let y0 = cmp::max(0, y_min.floor() as i32) as usize;
+        let y1 = cmp::min(frame_height as i32 - 1, y_max.floor() as i32) as usize;
 
         let area = edge_function(&v0_raster, &v1_raster, &v2_raster);
-
-        preparation_time += preparation_start.elapsed();
 
         for y in y0..(y1 + 1) {
             for x in x0..(x1 + 1) {
@@ -376,10 +322,10 @@ fn render_state(state: &State) -> DynamicImage{
                     edge_function(&v0_raster, &v1_raster, &pixel_pos) / area,
                 );
 
-                if (bar_coords.0 >= 0.0 && bar_coords.1 >= 0.0 && bar_coords.2 >= 0.0) {
+                if bar_coords.0 >= 0.0 && bar_coords.1 >= 0.0 && bar_coords.2 >= 0.0 {
                     let depth = 1.0 / (v0_raster.z * bar_coords.0 + v1_raster.z * bar_coords.1 + v2_raster.z * bar_coords.2);
 
-                    if (depth < z_buffer[y * frame_width + x]) {
+                    if depth < z_buffer[y * frame_width + x] {
                         z_buffer[y * frame_width + x] = depth;
 
                         let mut color = 0.1; // Ambient strength
@@ -401,7 +347,7 @@ fn render_state(state: &State) -> DynamicImage{
                             let diffuse_strength = point_normal_camera.dot_product(&light_dir);
                             color += diffuse_strength;
 
-                            if (state.specular_lighting_enabled) {
+                            if state.specular_lighting_enabled {
                                 let view_direction = (-&Vec3::new(pos_camera.x, pos_camera.y, pos_camera.z)).normalize();
 
                                 color += compute_specular(&point_normal_camera, &view_direction, &light_dir);
@@ -474,9 +420,9 @@ fn init_state(model: Model) -> State {
         object_to_world: AffineMat3::translation((&-&(&object_center * 2.5)).into()),
         camera: Camera {
             distance: distance,
-            eye: Point::new(0.0, 0.0, -distance),
-            look_at: Point::new(0.0, 0.0, -distance - 1.0),
-            up: Vec3::new(0.0, 1.0, 0.0),
+            fov: PI * 0.5,
+            near_clipping_plane: 1.0,
+            far_clipping_plane: 1000.0,
         },
         curr_mouse_x: 0.0,
         curr_mouse_y: 0.0,
@@ -487,6 +433,29 @@ fn init_state(model: Model) -> State {
         specular_lighting_enabled: false,
         tex_enabled: false,
     }
+}
+
+
+fn convert_to_raster(
+    vertex_obj: &Point, object_to_camera: &AffineMat3, camera: &Camera, viewing_plane: &ViewingPlane, frame_width: usize, frame_height: usize) -> Point {
+
+    // To camera space
+    let mut result = object_to_camera * vertex_obj;
+
+    // To clip space
+    // 1. Apply perspective
+    result.x = camera.near_clipping_plane * result.x / -result.z;
+    result.y = camera.near_clipping_plane * result.y / -result.z;
+    // 2.  Convert to [-1, 1]
+    result.x = (2.0 * result.x - (viewing_plane.x_max + viewing_plane.x_min)) / (viewing_plane.x_max - viewing_plane.x_min);
+    result.y = (2.0 * result.y - (viewing_plane.y_max + viewing_plane.y_min)) / (viewing_plane.y_max - viewing_plane.y_min);
+
+    // To screen space, i.e [0, w] and [0, h]
+    result.x = (result.x + 1.0) * 0.5 * (frame_width as f32);
+    result.y = (1.0 - result.y) * 0.5 * (frame_height as f32);
+    result.z = -result.z;
+
+    result
 }
 
 
@@ -525,7 +494,7 @@ fn compute_specular(normal: &Vec3, view_dir: &Vec3, light_dir: &Vec3) -> f32 {
 }
 
 #[inline]
-fn compute_stripe_color(s: f32, t: f32) -> f32 {
+fn compute_stripe_color(_s: f32, t: f32) -> f32 {
     let stripes_fuzz = 0.1;
     let stripes_width = 0.5;
     let stripes_scale = 20.0;
@@ -539,5 +508,5 @@ fn compute_stripe_color(s: f32, t: f32) -> f32 {
     let back_color = 0.0;
     let stripe_color = 0.7;
 
-    back_color * step_1 + (1.0 - step_1) * stripe_color
+    back_color * step_4 + (1.0 - step_4) * stripe_color
 }

@@ -16,7 +16,6 @@ mod basics;
 mod matrix;
 // mod ray_tracer;
 mod rasterizer;
-mod mesh;
 
 
 fn main() {

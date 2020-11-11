@@ -27,12 +27,12 @@ The binary file will be located at `target/release/cs248-computer-graphics`.
 There is also a binary attached which is located at `cs248-computer-graphics` (Note: compiled on OS X Catalina 10.15.6).
 
 ### Additional features implemented:
-- zoom-in/zoom-out (with clipping)
-- antialisasing via supersampling
 - phong shading
+- simple antialisasing (via supersampling)
+- zoom-in/zoom-out (_without_ clipping)
 - specular lighting (for both gouraud and phong)
-- texture mapping with toon effect
-- face culling
+- texture mapping with stripe effect
+- backface culling
 
 ### Screenshots
 ![Camera away](../images/assignment-2/camera-away.png "camera-away")
