@@ -29,6 +29,7 @@ struct State {
     arcball_enabled: bool,
     light_position: Point,
     is_gouraud_shading: bool,
+    is_antialiasing: bool,
 }
 
 struct Camera {
@@ -66,10 +67,10 @@ impl Camera {
 
 fn compute_screen_coordinates(
     film_aperture_width: f32, film_aperture_height: f32,
-    image_width: usize, image_height: usize, near_clipping_plane: f32, focal_len: f32) -> (f32, f32, f32, f32) {
+    frame_width: usize, frame_height: usize, near_clipping_plane: f32, focal_len: f32) -> (f32, f32, f32, f32) {
 
     let film_aspect_ratio = film_aperture_width / film_aperture_height;
-    let device_aspect_ratio = image_width as f32 / image_height as f32;
+    let device_aspect_ratio = frame_width as f32 / frame_height as f32;
 
     let mut top = ((film_aperture_height * inch_to_mm / 2.0) / focal_len) * near_clipping_plane;
     let mut right = ((film_aperture_width * inch_to_mm / 2.0) / focal_len) * near_clipping_plane;
@@ -98,7 +99,7 @@ fn compute_screen_coordinates(
 
 fn convert_to_raster(
     vertex_obj: &Point, object_to_camera: &AffineMat3, l: f32, r: f32, t: f32, b: f32,
-    near: f32, image_width: usize, image_height: usize) -> Point {
+    near: f32, frame_width: usize, frame_height: usize) -> Point {
 
     // To camera space
     let mut result = object_to_camera * vertex_obj;
@@ -112,8 +113,8 @@ fn convert_to_raster(
     result.y = 2.0 * result.y / (t - b) - (t + b) / (t - b);
 
     // To screen space, i.e [0, w] and [0, h]
-    result.x = (result.x + 1.0) * 0.5 * (image_width as f32);
-    result.y = (1.0 - result.y) * 0.5 * (image_height as f32);
+    result.x = (result.x + 1.0) * 0.5 * (frame_width as f32);
+    result.y = (1.0 - result.y) * 0.5 * (frame_height as f32);
     result.z = -result.z;
 
     result
@@ -152,6 +153,10 @@ fn update_on_event(app: &App, state: &mut State, event: Event) {
                 KeyPressed(key) => {
                     if key == Key::L {
                         state.is_gouraud_shading = !state.is_gouraud_shading;
+                    }
+
+                    if key == Key::A {
+                        state.is_antialiasing = !state.is_antialiasing;
                     }
                 },
                 _ => {}
@@ -236,32 +241,20 @@ fn render_state(state: &State) -> DynamicImage{
     let film_aperture_width = 0.980; // 35mm Full Aperture in inches
     let film_aperture_width = 0.735;
 
-    // let world_to_camera = Matrix4::new(
-    //     0.707107, 0.0, -0.707107, -1.63871,
-    //     -0.331295, 0.883452, -0.331295, -5.747777,
-    //     0.624695, 0.468521, 0.624695, -40.400412,
-    //     0.0, 0.0, 0.0, 1.0
-    // );
-    // let world_to_camera = Matrix4::new(
-    //     1.0, 0.0, 0.0, 0.0,
-    //     0.0, 1.0, 0.0, 0.0,
-    //     0.0, 0.0, 1.0, -40.400412,
-    //     0.0, 0.0, 0.0, 1.0
-    // );
     let world_to_camera = state.camera.compute_view_matrix();
     let object_to_camera = &world_to_camera * &state.object_to_world;
     let light_pos_camera = &world_to_camera * &state.light_position;
     let camera_to_object = object_to_camera.compute_inverse();
-    let image_width: usize = WIDTH;
-    let image_height: usize = HEIGHT;
+    let frame_width: usize = if state.is_antialiasing {WIDTH * 2} else {WIDTH};
+    let frame_height: usize = if state.is_antialiasing {HEIGHT * 2} else {HEIGHT};
 
     let (t, b, l, r) = compute_screen_coordinates(
-        film_aperture_width, film_aperture_width, image_width,
-        image_height, near_clipping_plane, focal_len);
+        film_aperture_width, film_aperture_width, frame_width,
+        frame_height, near_clipping_plane, focal_len);
 
     let bg_color = Color::new(236.0 / 255.0, 240.0 / 255.0, 241.0 / 255.0);
-    let mut frame_buffer = vec![bg_color; image_width * image_height];
-    let mut z_buffer = vec![far_clipping_plane; image_width * image_height];
+    let mut frame_buffer = vec![bg_color; frame_width * frame_height];
+    let mut z_buffer = vec![far_clipping_plane; frame_width * frame_height];
 
     let start = Instant::now();
     let mut preparation_time = Duration::from_secs(0);
@@ -279,9 +272,9 @@ fn render_state(state: &State) -> DynamicImage{
         let v2 = Point::new(model.mesh.positions[idx_3 * 3 + 0], model.mesh.positions[idx_3 * 3 + 1], model.mesh.positions[idx_3 * 3 + 2]);
 
         // Convert the vertices of the triangle to raster space
-        let mut v0_raster = convert_to_raster(&v0, &object_to_camera, l, r, t, b, near_clipping_plane, image_width, image_height);
-        let mut v1_raster = convert_to_raster(&v1, &object_to_camera, l, r, t, b, near_clipping_plane, image_width, image_height);
-        let mut v2_raster = convert_to_raster(&v2, &object_to_camera, l, r, t, b, near_clipping_plane, image_width, image_height);
+        let mut v0_raster = convert_to_raster(&v0, &object_to_camera, l, r, t, b, near_clipping_plane, frame_width, frame_height);
+        let mut v1_raster = convert_to_raster(&v1, &object_to_camera, l, r, t, b, near_clipping_plane, frame_width, frame_height);
+        let mut v2_raster = convert_to_raster(&v2, &object_to_camera, l, r, t, b, near_clipping_plane, frame_width, frame_height);
 
         // Precompute reciprocal of vertex z-coordinate
         v0_raster.z = 1.0 / v0_raster.z;
@@ -352,15 +345,15 @@ fn render_state(state: &State) -> DynamicImage{
         let y_max = max_of_three(v0_raster.y, v1_raster.y, v2_raster.y);
 
         // the triangle is out of screen
-        if (x_min > (image_width - 1) as f32 || x_max < 0.0 || y_min > (image_height - 1) as f32 || y_max < 0.0) {
+        if (x_min > (frame_width - 1) as f32 || x_max < 0.0 || y_min > (frame_height - 1) as f32 || y_max < 0.0) {
             continue;
         }
 
         // be careful x_min/x_max/y_min/y_max can be negative. Don't cast to uint32_t
         let x0 = cmp::max(0, (x_min.floor() as i32)) as usize;
-        let x1 = cmp::min(image_width as i32 - 1, (x_max.floor() as i32)) as usize;
+        let x1 = cmp::min(frame_width as i32 - 1, (x_max.floor() as i32)) as usize;
         let y0 = cmp::max(0, (y_min.floor() as i32)) as usize;
-        let y1 = cmp::min(image_height as i32 - 1, (y_max.floor() as i32)) as usize;
+        let y1 = cmp::min(frame_height as i32 - 1, (y_max.floor() as i32)) as usize;
 
         let area = edge_function(&v0_raster, &v1_raster, &v2_raster);
 
@@ -379,8 +372,8 @@ fn render_state(state: &State) -> DynamicImage{
                     let depth = 1.0 / (v0_raster.z * bar_coords.0 + v1_raster.z * bar_coords.1 + v2_raster.z * bar_coords.2);
 
                     // Depth-buffer test
-                    if (depth < z_buffer[y * image_width + x]) {
-                        z_buffer[y * image_width + x] = depth;
+                    if (depth < z_buffer[y * frame_width + x]) {
+                        z_buffer[y * frame_width + x] = depth;
 
                         // let tex_coords = (
                         //     (st0.0 * bar_coords.0 + st1.0 * bar_coords.1 + st2.0 * bar_coords.2) * depth,
@@ -416,7 +409,7 @@ fn render_state(state: &State) -> DynamicImage{
                         // n_dot_view *= c;
 
                         color += 0.1; // Ambient component
-                        frame_buffer[y * image_width + x] = Color::new(color, color, color);
+                        frame_buffer[y * frame_width + x] = Color::new(color, color, color);
                     }
                 }
             }
@@ -425,12 +418,23 @@ fn render_state(state: &State) -> DynamicImage{
 
     let duration = start.elapsed();
     println!("Rasterizer done! Took time: {} ms", duration.as_millis());
-    // println!("Preparation time took: {} ms", preparation_time.as_millis());
 
-    let mut img = RgbImage::new(image_width as u32, image_height as u32);
-    for y in 0..image_height {
-        for x in 0..image_width {
-            img.put_pixel(x as u32, y as u32, frame_buffer[image_width * y + x].clone().into());
+    let mut img = RgbImage::new(WIDTH as u32, HEIGHT as u32);
+    for y in 0..HEIGHT {
+        for x in 0..WIDTH {
+            let mut color = Color::zero();
+            if state.is_antialiasing {
+                // Mean filtering
+                color = color.add_no_clamp(&frame_buffer[WIDTH * 2 * (y * 2 + 0) + x * 2 + 0]);
+                color = color.add_no_clamp(&frame_buffer[WIDTH * 2 * (y * 2 + 0) + x * 2 + 1]);
+                color = color.add_no_clamp(&frame_buffer[WIDTH * 2 * (y * 2 + 1) + x * 2 + 0]);
+                color = color.add_no_clamp(&frame_buffer[WIDTH * 2 * (y * 2 + 1) + x * 2 + 1]);
+                color = &color * 0.25;
+            } else {
+                color = frame_buffer[WIDTH * y + x];
+            };
+
+            img.put_pixel(x as u32, y as u32, color.into());
         }
     }
 
@@ -443,7 +447,7 @@ fn render_state(state: &State) -> DynamicImage{
 
 fn init_state(model: Model) -> State {
     println!("Building model!");
-    let distance = -3.0;
+    let distance = -2.0;
 
     let mut object_center = Point::zero();
     for i in 0..((model.mesh.positions.len() / 3) as usize) {
@@ -471,6 +475,7 @@ fn init_state(model: Model) -> State {
         arcball_enabled: false,
         light_position: Point::new(0.0, 100.0, 0.0),
         is_gouraud_shading: true,
+        is_antialiasing: false,
     }
 }
 

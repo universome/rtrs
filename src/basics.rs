@@ -15,11 +15,23 @@ impl Color {
         (&Color {r: r, g: g, b: b}).clamp()
     }
 
+    pub fn zero() -> Color {
+        Color::new(0.0, 0.0, 0.0)
+    }
+
     pub fn clamp(&self) -> Color {
         Color {
             r: self.r.max(0.0).min(1.0),
             g: self.g.max(0.0).min(1.0),
             b: self.b.max(0.0).min(1.0),
+        }
+    }
+
+    pub fn add_no_clamp(&self, other: &Color) -> Color {
+        Color {
+            r: self.r + other.r,
+            g: self.g + other.g,
+            b: self.b + other.b,
         }
     }
 }
@@ -40,11 +52,7 @@ impl ops::Add<&Color> for &Color {
     type Output = Color;
 
     fn add(self, other: &Color) -> Color {
-        (Color {
-            r: self.r + other.r,
-            g: self.g + other.g,
-            b: self.b + other.b,
-        }).clamp()
+        self.add_no_clamp(other).clamp()
     }
 }
 
