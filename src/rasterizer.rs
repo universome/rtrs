@@ -200,7 +200,12 @@ fn init_app(app: &App) -> State {
         .build()
         .unwrap();
 
-    let camera_distance = if obj_file == "resources/KAUST_Beacon.obj" {-800.0} else {-2.0};
+    let camera_distance = match obj_file.as_str() {
+        "resources/KAUST_Beacon.obj" => -800.0,
+        "resources/bs_ears.obj" => -2.0,
+        "resources/teapot.obj" => -100.0,
+        _ => -10.0,
+    };
     let mut state = init_state(models[0].clone(), camera_distance);
 
     (*app.main_window()).set_cursor_position_points(WIDTH as f32 / 2.0, HEIGHT as f32 / 2.0);
