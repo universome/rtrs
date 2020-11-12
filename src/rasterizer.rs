@@ -3,7 +3,6 @@ use std::f32::consts::{PI};
 use std::cmp;
 use std::env;
 
-// use nalgebra::{Matrix4, Vector3, Point3};
 use nannou::prelude::*;
 use nannou::image::{DynamicImage, RgbImage};
 use tobj::{Model};
@@ -175,7 +174,6 @@ fn update_on_event(app: &App, state: &mut State, event: Event) {
     let axis_world = (camera_to_world * axis_camera).normalize();
     let rotation = AffineMat3::rotation(angle, &axis_world);
 
-    // state.object_rotation = &rotation * &state.object_rotation;
     state.object_to_world = &rotation * &state.object_to_world;
     state.curr_mouse_x = app.mouse.x;
     state.curr_mouse_y = app.mouse.y;
@@ -245,15 +243,9 @@ fn render_state(state: &State) -> DynamicImage{
         let v1 = Point::new(model.mesh.positions[idx_2 * 3 + 0], model.mesh.positions[idx_2 * 3 + 1], model.mesh.positions[idx_2 * 3 + 2]);
         let v2 = Point::new(model.mesh.positions[idx_3 * 3 + 0], model.mesh.positions[idx_3 * 3 + 1], model.mesh.positions[idx_3 * 3 + 2]);
 
-        // Convert the vertices of the triangle to raster space
-        let mut v0_raster = convert_to_raster(&v0, &object_to_camera, &state.camera, &viewing_plane, frame_width, frame_height);
-        let mut v1_raster = convert_to_raster(&v1, &object_to_camera, &state.camera, &viewing_plane, frame_width, frame_height);
-        let mut v2_raster = convert_to_raster(&v2, &object_to_camera, &state.camera, &viewing_plane, frame_width, frame_height);
-
-        // Precompute reciprocal of vertex z-coordinate
-        v0_raster.z = 1.0 / v0_raster.z;
-        v1_raster.z = 1.0 / v1_raster.z;
-        v2_raster.z = 1.0 / v2_raster.z;
+        let v0_screen = convert_to_screen(&v0, &object_to_camera, &state.camera, &viewing_plane, frame_width, frame_height);
+        let v1_screen = convert_to_screen(&v1, &object_to_camera, &state.camera, &viewing_plane, frame_width, frame_height);
+        let v2_screen = convert_to_screen(&v2, &object_to_camera, &state.camera, &viewing_plane, frame_width, frame_height);
 
         // Gouraud shading coloring
         // TODO: the best option would be to compute the normal and v_cam inside the first run...
@@ -299,47 +291,43 @@ fn render_state(state: &State) -> DynamicImage{
             normal_v2_camera = &object_to_camera * &normal_v2;
         }
 
-        // Prepare vertex attributes. Divde them by their vertex z-coordinate
-        // (though we use a multiplication here because v.z = 1 / v.z)
         let mut st0 = (0.0, 0.0);
         let mut st1 = (0.0, 0.0);
         let mut st2 = (0.0, 0.0);
 
         if !tex.is_empty() && state.tex_enabled {
-            st0 = (tex[idx_1 * 2] * v0_raster.z, tex[idx_1 * 2 + 1] * v0_raster.z);
-            st1 = (tex[idx_2 * 2] * v1_raster.z, tex[idx_2 * 2 + 1] * v1_raster.z);
-            st2 = (tex[idx_3 * 2] * v2_raster.z, tex[idx_3 * 2 + 1] * v2_raster.z);
+            st0 = (tex[idx_1 * 2] / v0_screen.z, tex[idx_1 * 2 + 1] / v0_screen.z);
+            st1 = (tex[idx_2 * 2] / v1_screen.z, tex[idx_2 * 2 + 1] / v1_screen.z);
+            st2 = (tex[idx_3 * 2] / v2_screen.z, tex[idx_3 * 2 + 1] / v2_screen.z);
         }
 
-        let x_min = min_of_three(v0_raster.x, v1_raster.x, v2_raster.x);
-        let y_min = min_of_three(v0_raster.y, v1_raster.y, v2_raster.y);
-        let x_max = max_of_three(v0_raster.x, v1_raster.x, v2_raster.x);
-        let y_max = max_of_three(v0_raster.y, v1_raster.y, v2_raster.y);
+        let x_min = min_of_three(v0_screen.x, v1_screen.x, v2_screen.x);
+        let y_min = min_of_three(v0_screen.y, v1_screen.y, v2_screen.y);
+        let x_max = max_of_three(v0_screen.x, v1_screen.x, v2_screen.x);
+        let y_max = max_of_three(v0_screen.y, v1_screen.y, v2_screen.y);
 
-        // the triangle is out of screen
         if x_min > (frame_width - 1) as f32 || x_max < 0.0 || y_min > (frame_height - 1) as f32 || y_max < 0.0 {
             continue;
         }
 
-        // be careful x_min/x_max/y_min/y_max can be negative. Don't cast to uint32_t
         let x0 = cmp::max(0, x_min.floor() as i32) as usize;
         let x1 = cmp::min(frame_width as i32 - 1, x_max.floor() as i32) as usize;
         let y0 = cmp::max(0, y_min.floor() as i32) as usize;
         let y1 = cmp::min(frame_height as i32 - 1, y_max.floor() as i32) as usize;
 
-        let area = edge_function(&v0_raster, &v1_raster, &v2_raster);
+        let area = edge_function(&v0_screen, &v1_screen, &v2_screen);
 
         for y in y0..(y1 + 1) {
             for x in x0..(x1 + 1) {
                 let pixel_pos = Point::new(x as f32 + 0.5, y as f32 + 0.5, 0.0);
                 let bar_coords = (
-                    edge_function(&v1_raster, &v2_raster, &pixel_pos) / area,
-                    edge_function(&v2_raster, &v0_raster, &pixel_pos) / area,
-                    edge_function(&v0_raster, &v1_raster, &pixel_pos) / area,
+                    edge_function(&v1_screen, &v2_screen, &pixel_pos) / area,
+                    edge_function(&v2_screen, &v0_screen, &pixel_pos) / area,
+                    edge_function(&v0_screen, &v1_screen, &pixel_pos) / area,
                 );
 
                 if bar_coords.0 >= 0.0 && bar_coords.1 >= 0.0 && bar_coords.2 >= 0.0 {
-                    let depth = 1.0 / (v0_raster.z * bar_coords.0 + v1_raster.z * bar_coords.1 + v2_raster.z * bar_coords.2);
+                    let depth = 1.0 / (bar_coords.0 / v0_screen.z + bar_coords.1 / v1_screen.z + bar_coords.2 / v2_screen.z);
 
                     if depth < z_buffer[y * frame_width + x] {
                         z_buffer[y * frame_width + x] = depth;
@@ -358,7 +346,6 @@ fn render_state(state: &State) -> DynamicImage{
                             let py = (v0_camera.y / -v0_camera.z) * bar_coords.0 + (v1_camera.y / -v1_camera.z) * bar_coords.1 + (v2_camera.y / -v2_camera.z) * bar_coords.2;
                             let pos_camera = Point::new(px * depth, py * depth, -depth); // fragmet position is in the camera space
                             let light_dir = (&light_pos_camera - &pos_camera).normalize();
-                            // let point_normal_camera = normal_v0_camera * bar_coords.0 + normal_v1_camera * bar_coords.1 + normal_v2_camera * bar_coords.2;
                             let point_normal_camera = (&normal_v0_camera * bar_coords.0  + &normal_v1_camera * bar_coords.1  + &normal_v2_camera * bar_coords.2).normalize();
                             let diffuse_strength = point_normal_camera.dot_product(&light_dir);
                             color += diffuse_strength;
@@ -451,16 +438,18 @@ fn init_state(model: Model, camera_distance: f32) -> State {
 }
 
 
-fn convert_to_raster(
-    vertex_obj: &Point, object_to_camera: &AffineMat3, camera: &Camera, viewing_plane: &ViewingPlane, frame_width: usize, frame_height: usize) -> Point {
+fn convert_to_screen(
+    vertex_obj: &Point, object_to_camera: &AffineMat3, camera: &Camera,
+    viewing_plane: &ViewingPlane, frame_width: usize, frame_height: usize) -> Point {
 
     // To camera space
     let mut result = object_to_camera * vertex_obj;
+    result.z = -result.z;
 
     // To clip space
     // 1. Apply perspective
-    result.x = camera.near_clipping_plane * result.x / -result.z;
-    result.y = camera.near_clipping_plane * result.y / -result.z;
+    result.x = camera.near_clipping_plane * result.x / result.z;
+    result.y = camera.near_clipping_plane * result.y / result.z;
     // 2.  Convert to [-1, 1]
     result.x = (2.0 * result.x - (viewing_plane.x_max + viewing_plane.x_min)) / (viewing_plane.x_max - viewing_plane.x_min);
     result.y = (2.0 * result.y - (viewing_plane.y_max + viewing_plane.y_min)) / (viewing_plane.y_max - viewing_plane.y_min);
@@ -468,7 +457,6 @@ fn convert_to_raster(
     // To screen space, i.e [0, w] and [0, h]
     result.x = (result.x + 1.0) * 0.5 * (frame_width as f32);
     result.y = (1.0 - result.y) * 0.5 * (frame_height as f32);
-    result.z = -result.z;
 
     result
 }
