@@ -13,6 +13,7 @@ You can pass other models as well, but you would need to specify a camera distan
 - `T` — enable texture mapping with stripe effect
 - `A` — enable/disable antialiasing via supersampling
 - `Q` — enable/disable specular lighting
+- `B` — enable/disable backface culling (enabled by default)
 - `S` — save the current frame
 
 ### How to run the code

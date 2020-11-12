@@ -322,15 +322,15 @@ fn render_state(state: &State) -> DynamicImage{
         let y0 = cmp::max(0, y_min.floor() as i32) as usize;
         let y1 = cmp::min(frame_height as i32 - 1, y_max.floor() as i32) as usize;
 
-        let area = edge_function(&v0_screen, &v1_screen, &v2_screen);
+        let area = compute_det_from_points(&v0_screen, &v1_screen, &v2_screen);
 
         for y in y0..(y1 + 1) {
             for x in x0..(x1 + 1) {
                 let pixel_pos = Point::new(x as f32 + 0.5, y as f32 + 0.5, 0.0);
                 let bar_coords = (
-                    edge_function(&v1_screen, &v2_screen, &pixel_pos) / area,
-                    edge_function(&v2_screen, &v0_screen, &pixel_pos) / area,
-                    edge_function(&v0_screen, &v1_screen, &pixel_pos) / area,
+                    compute_det_from_points(&v1_screen, &v2_screen, &pixel_pos) / area,
+                    compute_det_from_points(&v2_screen, &v0_screen, &pixel_pos) / area,
+                    compute_det_from_points(&v0_screen, &v1_screen, &pixel_pos) / area,
                 );
 
                 if bar_coords.0 >= 0.0 && bar_coords.1 >= 0.0 && bar_coords.2 >= 0.0 {
@@ -452,7 +452,7 @@ fn convert_to_screen(
 
     // To camera space
     let mut result = object_to_camera * vertex_obj;
-    result.z = -result.z;
+    result.z = -result.z; // Since our camera coordinate system looks "behind"
 
     // To clip space
     // 1. Apply perspective
@@ -471,7 +471,7 @@ fn convert_to_screen(
 
 
 #[inline]
-fn edge_function(u: &Point, v: &Point, point: &Point) -> f32 {
+fn compute_det_from_points(u: &Point, v: &Point, point: &Point) -> f32 {
     // Given two vectors u, v, computes the edge function for the given point
     (point.x - u.x) * (v.y - u.y) - (point.y - u.y) * (v.x - u.x)
 }
