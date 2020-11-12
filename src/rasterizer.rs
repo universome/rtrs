@@ -29,6 +29,7 @@ struct State {
     specular_lighting_enabled: bool,
     tex_enabled: bool,
     scroll_speed: f32,
+    backface_culling_enabled: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -135,6 +136,10 @@ fn update_on_event(app: &App, state: &mut State, event: Event) {
 
                     if key == Key::T {
                         state.tex_enabled = !state.tex_enabled || state.model.mesh.normals.is_empty();
+                    }
+
+                    if key == Key::B {
+                        state.backface_culling_enabled = !state.backface_culling_enabled;
                     }
 
                     if key == Key::S {
@@ -260,9 +265,11 @@ fn render_state(state: &State) -> DynamicImage{
         let face_normal_camera = (&((&v1_camera - &v0_camera).cross_product(&(&v2_camera - &v0_camera)))).normalize();
 
         // Making backface culling
-        let v0_view_direction = (-&Vec3::new(v0_camera.x, v0_camera.y, v0_camera.z)).normalize();
-        if v0_view_direction.dot_product(&face_normal_camera) < 0.0 {
-            continue;
+        if state.backface_culling_enabled {
+            let v0_view_direction = (-&Vec3::new(v0_camera.x, v0_camera.y, v0_camera.z)).normalize();
+            if v0_view_direction.dot_product(&face_normal_camera) < 0.0 {
+                continue;
+            }
         }
 
         let colors_gouraud = (
@@ -434,6 +441,7 @@ fn init_state(model: Model, camera_distance: f32) -> State {
         specular_lighting_enabled: false,
         tex_enabled: false,
         scroll_speed: 0.01,
+        backface_culling_enabled: true,
     }
 }
 
