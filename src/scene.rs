@@ -77,7 +77,7 @@ impl Scene {
             let eye_dir = (&self.camera.origin - &hit_point_world).normalize();
             let half_vector = (eye_dir + light_dir).normalize();
             // let spec_strength = obj.get_specular_strength() * hit.normal.dot_product(&half_vector).max(0.0).powf(64.0);
-            let spec_strength = 0.2 * hit.normal.dot_product(&half_vector).max(0.0).powf(64.0);
+            let spec_strength = 0.0;
             let spec_color = (&Color {r: 1.0, g: 1.0, b: 1.0}) * spec_strength;
 
             color = (&(&color + &diffuse_light_color) + &spec_color).clamp();
