@@ -24,14 +24,49 @@ pub struct Triangle {
 
 impl Surface for Triangle {
     fn compute_hit(&self, ray: &Ray, debug: bool) -> Option<f32> {
-        None
+        let v0 = &self.positions[self.vertices.0];
+        let v1 = &self.positions[self.vertices.1];
+        let v2 = &self.positions[self.vertices.2];
+        let edge_01 = v1 - v0;
+        let edge_02 = v2 - v0;
+        // println!("Edges: {:?} and {:?}", edge_01, edge_02);
+        let face_normal = &edge_01.cross_product(&edge_02).normalize();
+        let t_denom = face_normal.dot_product(&ray.direction);
+
+        // println!("face_normal: {:?}", face_normal);
+
+        if t_denom.abs() < 0.000001 {
+            // The ray and the triangle are parallel
+            // println!("T denom: {:?}", t_denom);
+            return None;
+        }
+
+        let plane_bias = -face_normal.dot_product(&v0.into());
+        let t = -(face_normal.dot_product(&(&ray.origin).into()) + plane_bias) / t_denom;
+
+        if t < MIN_RAY_T {
+            // The triangle is either behind or too close
+            // println!("TOO SMALL {:?}", t);
+            return None;
+        }
+
+        let hit_point = &ray.compute_point(t);
+
+        if is_on_the_right(hit_point, v0, v1, face_normal) ||
+           is_on_the_right(hit_point, v1, v2, face_normal) ||
+           is_on_the_right(hit_point, v2, v0, face_normal) {
+            // println!("Is on the right!");
+            return None;
+        }
+
+        Some(t)
     }
 
     fn compute_normal(&self, point: &Point) -> Vec3 {
         Vec3 {x: 0.0, y: -1.0, z: 0.0}
     }
 
-    fn get_color(&self) -> Color { Color::zero() }
+    fn get_color(&self) -> Color { Color {r: 0.3, g: 0.3, b: 0.3} }
     fn get_specular_strength(&self) -> f32 { 0.5 }
 }
 
@@ -51,22 +86,16 @@ impl TriangleMesh {
         // let mut triangle_mesh = TriangleMesh {triangles: vec![], positions: vec![], normals: None};
         let mut positions = vec![];
 
-        for i in 0..num_triangles {
-            let idx_1 = model.mesh.indices[i * 3 + 0] as usize;
-            let idx_2 = model.mesh.indices[i * 3 + 1] as usize;
-            let idx_3 = model.mesh.indices[i * 3 + 2] as usize;
+        // println!("Num triangles: {}", num_triangles);
 
-            let v0 = Point::new(model.mesh.positions[idx_1 * 3 + 0], model.mesh.positions[idx_1 * 3 + 1], model.mesh.positions[idx_1 * 3 + 2]);
-            let v1 = Point::new(model.mesh.positions[idx_2 * 3 + 0], model.mesh.positions[idx_2 * 3 + 1], model.mesh.positions[idx_2 * 3 + 2]);
-            let v2 = Point::new(model.mesh.positions[idx_3 * 3 + 0], model.mesh.positions[idx_3 * 3 + 1], model.mesh.positions[idx_3 * 3 + 2]);
-
-            // let normal_v0 = Vec3::new(model.mesh.normals[idx_1 * 3 + 0], model.mesh.normals[idx_1 * 3 + 1], model.mesh.normals[idx_1 * 3 + 2]);
-            // let normal_v1 = Vec3::new(model.mesh.normals[idx_2 * 3 + 0], model.mesh.normals[idx_2 * 3 + 1], model.mesh.normals[idx_2 * 3 + 2]);
-            // let normal_v2 = Vec3::new(model.mesh.normals[idx_3 * 3 + 0], model.mesh.normals[idx_3 * 3 + 1], model.mesh.normals[idx_3 * 3 + 2]);
-
-            positions.push(v0);
-            positions.push(v1);
-            positions.push(v2);
+        // We are going to convert a flattened array of [x1, y1, z1, x2, y2, z2, ...]
+        // into an array of points [(x1, y1, z1), (x2, y2, z2), ...]
+        for i in 0..(model.mesh.positions.len() / 3) {
+            positions.push(Point::new(
+                model.mesh.positions[i * 3 + 0],
+                model.mesh.positions[i * 3 + 1],
+                model.mesh.positions[i * 3 + 2]
+            ));
         }
 
         let positions_arc = Arc::new(positions);
@@ -74,7 +103,11 @@ impl TriangleMesh {
 
         for i in 0..num_triangles {
             triangles.push(Triangle {
-                vertices: (i * 3 + 0, i * 3 + 1, i * 3 + 2),
+                vertices: (
+                    model.mesh.indices[i * 3 + 0] as usize,
+                    model.mesh.indices[i * 3 + 1] as usize,
+                    model.mesh.indices[i * 3 + 2] as usize
+                ),
                 positions: positions_arc.clone(),
             });
         }
@@ -90,13 +123,79 @@ impl TriangleMesh {
 
 impl Surface for TriangleMesh {
     fn compute_hit(&self, ray: &Ray, debug: bool) -> Option<f32> {
-        None
+        let mut min_t = f32::INFINITY;
+
+        for triangle in self.triangles.iter() {
+            if let Some(t) = triangle.compute_hit(ray, debug) {
+                min_t = if t < min_t { t } else { min_t };
+            }
+        }
+
+        if min_t < f32::INFINITY {
+            Some(min_t)
+        } else {
+            None
+        }
     }
 
     fn compute_normal(&self, point: &Point) -> Vec3 {
         Vec3 {x: 0.0, y: -1.0, z: 0.0}
     }
 
-    fn get_color(&self) -> Color { Color::zero() }
+    fn get_color(&self) -> Color { Color {r: 0.3, g: 0.3, b: 0.3} }
     fn get_specular_strength(&self) -> f32 { 0.5 }
+}
+
+#[inline]
+fn is_on_the_right(hit_point: &Point, from: &Point, to: &Point, normal: &Vec3) -> bool {
+    // Checks if the intersection point is on the left of the line
+    // which goes from `from` to `to` points with the given `normal` normal
+    let normal_for_intersection = (&(to - from)).cross_product(&(hit_point - from));
+
+    normal.dot_product(&normal_for_intersection) < 0.0
+}
+
+
+#[cfg(test)]
+mod mesh_tests {
+    use super::*;
+
+    #[test]
+    fn test_ray_triangle_intersection() {
+        let ray = Ray {
+            origin: Point {x: 0.0, y: 0.0, z: 0.0},
+            direction: Vec3 {x: 0.0, y: 0.0, z: 1.0},
+        };
+        let vertex_positions = Arc::new(vec![
+            Point {x: 0.0, y: 0.0, z: 1.0},
+            Point {x: 1.0, y: 0.0, z: 1.0},
+            Point {x: 0.0, y: 1.0, z: 1.0},
+        ]);
+        let triangle_a = Triangle {
+            vertices: (0, 1, 2),
+            positions: vertex_positions.clone(),
+        };
+        // let triangle_b = Triangle {
+        //     vertices: (0, 2, 1),
+        //     positions: vertex_positions.clone(),
+        // };
+        let t_a = triangle_a.compute_hit(&ray, false).unwrap_or(f32::INFINITY);
+        // let t_b = triangle_b.compute_hit(&ray, false);
+
+        assert!(approx_eq!(f32, t_a, 1.0));
+        // assert!(t_b.is_none());
+    }
+
+    #[test]
+    fn test_ray_mesh_intersection() {
+        let mesh = TriangleMesh::from_obj("resources/square.obj");
+        // let mesh = TriangleMesh::from_obj("resources/cube.obj");
+        let ray = Ray {
+            origin: Point {x: 0.0, y: 0.0, z: -1.0},
+            direction: Vec3 {x: 0.0, y: 0.0, z: 1.0},
+        };
+
+        let t = mesh.compute_hit(&ray, false).unwrap_or(f32::INFINITY);
+        assert!(approx_eq!(f32, t, 1.0));
+    }
 }

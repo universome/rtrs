@@ -153,8 +153,8 @@ fn process_keys(app: &App, state: &mut State) {
             transformation = Some(AffineMat3::rotation(state.rotation_speed, &Vec3::new(0.0, 0.0, 1.0)));
         }
 
-        if let Some(T) = transformation {
-            state.opts.transformations[idx] = &state.opts.transformations[idx] * &T;
+        if transformation.is_some() {
+            state.opts.transformations[idx] = &state.opts.transformations[idx] * &transformation.unwrap();
         }
     }
 
@@ -372,7 +372,11 @@ fn setup_scene(render_options: &RenderOptions) -> Scene {
     //     .next()
     //     .expect("A .obj file to print is required");
     // let (models, _) = tobj::load_obj(&obj_file, true).unwrap();
-    let model_surface = TriangleMesh::from_obj("resources/cube.obj");
+    // let mesh_surface = TriangleMesh::from_obj("resources/square.obj");
+    let mesh_surface = TriangleMesh::from_obj("resources/cube.obj");
+    // let mesh_surface = TriangleMesh::from_obj("resources/teapot.obj");
+    let mesh_transform = &lookat_transform * &render_options.transformations[1];
+    let transformed_mesh = TransformedSurface::new(mesh_transform, mesh_surface);
 
     Scene {
         objects: vec![
@@ -380,7 +384,7 @@ fn setup_scene(render_options: &RenderOptions) -> Scene {
             // Box::new(transformed_sphere_a),
             // Box::new(transformed_sphere_b),
             // Box::new(transformed_cone),
-            Box::new(model_surface),
+            Box::new(transformed_mesh),
         ],
         camera: Camera::from_z_position(-1.0, render_options.fov, render_options.projection_type, WIDTH, HEIGHT),
         background_color: Color {r: 0.204, g: 0.596, b: 0.86},
@@ -398,7 +402,7 @@ impl RenderOptions {
             number_of_lights: 1,
             selected_pixel: None,
             selected_object_idx: None,
-            spheres_fly_radius: 3.0,
+            spheres_fly_radius: 1.0,
             spheres_fly_speed: 0.3,
             specular_strengths: [0.0, 0.0, 0.0, 0.0, 0.0],
             fov: std::f32::consts::PI * 0.5,
@@ -411,7 +415,7 @@ impl RenderOptions {
                 AffineMat3::identity(),
                 AffineMat3 {
                     transform_mat: &Mat3::identity() * 0.25,
-                    translation: Vec3::new(0.0, 0.0, 0.0),
+                    translation: Vec3::new(0.0, -0.5, 0.0),
                 },
                 AffineMat3 {
                     transform_mat: &Mat3::identity() * 0.25,

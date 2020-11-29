@@ -33,15 +33,15 @@ impl Scene {
 
     pub fn compute_pixel(&self, i: u32, j: u32, _debug: bool) -> Color {
         // let closest_obj = self.get_object_at_pixel(i, j);
-        let ray_ws = self.camera.generate_ray(i, j);
+        let ray_world = self.camera.generate_ray(i, j);
         let mut closest_obj = None;
-        let mut min_t_ws = f32::INFINITY;
+        let mut min_t_world = f32::INFINITY;
 
         for object in self.objects.iter() {
-            if let Some(t_ws) = object.compute_hit(&ray_ws, _debug) {
-                if t_ws < min_t_ws {
-                    closest_obj = Some((object, t_ws));
-                    min_t_ws = t_ws;
+            if let Some(t_world) = object.compute_hit(&ray_world, _debug) {
+                if t_world < min_t_world {
+                    closest_obj = Some((object, t_world));
+                    min_t_world = t_world;
                 }
             }
         }
@@ -50,16 +50,16 @@ impl Scene {
             return self.background_color.clone();
         }
 
-        let (obj, min_t_ws) = closest_obj.unwrap();
+        let (obj, min_t_world) = closest_obj.unwrap();
         let mut color = &obj.get_color() * self.ambient_strength;
-        let hit_point_ws = ray_ws.compute_point(min_t_ws); // TODO: do not recompute the hit hit_point
-        let normal_ws = obj.compute_normal(&hit_point_ws);
+        let hit_point_world = ray_world.compute_point(min_t_world); // TODO: do not recompute the hit hit_point
+        let normal_world = obj.compute_normal(&hit_point_world);
 
-        for light_ws in self.lights.iter() {
-            let distance_to_light = (&light_ws.location - &hit_point_ws).norm();
-            let light_dir = (&light_ws.location - &hit_point_ws).normalize();
+        for light_world in self.lights.iter() {
+            let distance_to_light = (&light_world.location - &hit_point_world).norm();
+            let light_dir = (&light_world.location - &hit_point_world).normalize();
             let shadow_ray = Ray {
-                origin: &hit_point_ws.clone() + &(&light_dir.clone() * 0.0001),
+                origin: &hit_point_world.clone() + &(&light_dir.clone() * 0.0001),
                 direction: light_dir.clone(),
             };
 
@@ -69,13 +69,13 @@ impl Scene {
                     continue;
             }
 
-            let diffuse_cos = normal_ws.dot_product(&light_dir.normalize()).max(0.0);
-            let diffuse_light_color = &light_ws.color * (diffuse_cos * self.diffuse_strength);
+            let diffuse_cos = normal_world.dot_product(&light_dir.normalize()).max(0.0);
+            let diffuse_light_color = &light_world.color * (diffuse_cos * self.diffuse_strength);
 
             // Specular light component
-            let eye_dir = (&self.camera.origin - &hit_point_ws).normalize();
+            let eye_dir = (&self.camera.origin - &hit_point_world).normalize();
             let half_vector = (eye_dir + light_dir).normalize();
-            let spec_strength = obj.get_specular_strength() * normal_ws.dot_product(&half_vector).max(0.0).powf(64.0);
+            let spec_strength = obj.get_specular_strength() * normal_world.dot_product(&half_vector).max(0.0).powf(64.0);
             let spec_color = (&Color {r: 1.0, g: 1.0, b: 1.0}) * spec_strength;
 
             color = (&(&color + &diffuse_light_color) + &spec_color).clamp();
@@ -89,7 +89,7 @@ impl Scene {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::surface::Sphere;
+    use crate::surface::quadrics::Sphere;
 
     #[test]
     fn test_sphere() {

@@ -411,8 +411,8 @@ mod tests {
 
     #[test]
     fn test_rotation() {
-        let rotation = Mat3::rotation(std::f32::consts::PI * 0.5, Vec3::new(0.0, 1.0, 0.0));
-        let reverse_rotation = Mat3::rotation(-std::f32::consts::PI * 0.5, Vec3::new(0.0, 1.0, 0.0));
+        let rotation = Mat3::rotation(std::f32::consts::PI * 0.5, &Vec3::new(0.0, 1.0, 0.0));
+        let reverse_rotation = Mat3::rotation(-std::f32::consts::PI * 0.5, &Vec3::new(0.0, 1.0, 0.0));
         let rotation_product = &rotation * &reverse_rotation;
 
         assert!(approx_eq!(f32, rotation_product[0][0], 1.0, epsilon=0.0001));
