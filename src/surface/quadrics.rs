@@ -1,4 +1,4 @@
-use crate::surface::surface::{Surface};
+use crate::surface::surface::{Surface, Hit};
 use crate::basics::*;
 use crate::matrix::{Mat3, AffineMat3};
 use crate::surface::MIN_RAY_T;
@@ -22,11 +22,15 @@ impl Sphere {
             specular_strength: 0.0,
         }
     }
+
+    fn compute_normal(&self, point: &Point) -> Vec3 {
+        &(point - &self.center) * (1. / self.radius)
+    }
 }
 
 
 impl Surface for Sphere {
-    fn compute_hit(&self, ray: &Ray, debug: bool) -> Option<f32> {
+    fn compute_hit(&self, ray: &Ray, debug: bool) -> Option<Hit> {
         // debug_assert!(is_unit_length(ray.direction));
         let orig_to_c = &self.center - &ray.origin;
         let roots = find_square_roots(
@@ -34,12 +38,11 @@ impl Surface for Sphere {
             -2.0 * ray.direction.dot_product(&orig_to_c),
             orig_to_c.norm_squared() - self.radius * self.radius,
         )?;
+        let t = select_smallest_positive_root(roots)?;
+        let hit_point = ray.compute_point(t);
+        let normal = self.compute_normal(&hit_point);
 
-        select_smallest_positive_root(roots)
-    }
-
-    fn compute_normal(&self, point: &Point) -> Vec3 {
-        &(point - &self.center) * (1. / self.radius)
+        Some(Hit {t: t, normal: normal})
     }
 
     fn get_color(&self) -> Color {
@@ -67,16 +70,16 @@ impl Plane {
             color: color
         }
     }
+
+    fn compute_normal(&self, _point: &Point) -> Vec3 {
+        self.normal.clone()
+    }
 }
 
 
 impl Surface for Plane {
-    fn compute_hit(&self, ray: &Ray, debug: bool) -> Option<f32> {
+    fn compute_hit(&self, ray: &Ray, debug: bool) -> Option<Hit> {
         compute_plane_hit(&self.bias, &self.normal, ray)
-    }
-
-    fn compute_normal(&self, _point: &Point) -> Vec3 {
-        self.normal.clone()
     }
 
     fn get_color(&self) -> Color {
@@ -95,8 +98,20 @@ pub struct Ellipsoid {
     pub scale: DiagMat3,
 }
 
+
+impl Ellipsoid {
+    fn compute_normal(&self, point: &Point) -> Vec3 {
+        (Vec3 {
+            x: 2.0 * (point.x - self.center.x) / (self.scale.a * self.scale.a),
+            y: 2.0 * (point.y - self.center.y) / (self.scale.b * self.scale.b),
+            z: 2.0 * (point.z - self.center.z) / (self.scale.c * self.scale.c),
+        }).normalize()
+    }
+}
+
+
 impl Surface for Ellipsoid {
-    fn compute_hit(&self, ray: &Ray, debug: bool) -> Option<f32> {
+    fn compute_hit(&self, ray: &Ray, debug: bool) -> Option<Hit> {
         let scale_inv = self.scale.compute_inverse();
         let orig_to_c_scaled = &scale_inv * &(&self.center - &ray.origin);
         let ray_dir_scaled = &scale_inv * &ray.direction;
@@ -106,15 +121,11 @@ impl Surface for Ellipsoid {
             orig_to_c_scaled.norm_squared() - 1.0,
         )?;
 
-        select_smallest_positive_root(roots)
-    }
+        let t = select_smallest_positive_root(roots)?;
+        let hit_point = ray.compute_point(t);
+        let normal = self.compute_normal(&hit_point);
 
-    fn compute_normal(&self, point: &Point) -> Vec3 {
-        (Vec3 {
-            x: 2.0 * (point.x - self.center.x) / (self.scale.a * self.scale.a),
-            y: 2.0 * (point.y - self.center.y) / (self.scale.b * self.scale.b),
-            z: 2.0 * (point.z - self.center.z) / (self.scale.c * self.scale.c),
-        }).normalize()
+        Some(Hit {t: t, normal: normal})
     }
 
     fn get_color(&self) -> Color { self.color.clone() }
@@ -133,7 +144,7 @@ pub struct Cone {
 
 
 impl Cone {
-    fn compute_cone_hit(&self, ray: &Ray) -> Option<f32> {
+    fn compute_cone_hit(&self, ray: &Ray) -> Option<Hit> {
         let s = self.half_angle.tanh().powi(2);
         let roots = find_square_roots(
             ray.direction.x.powi(2) + ray.direction.z.powi(2) - ray.direction.y.powi(2) * s,
@@ -145,18 +156,21 @@ impl Cone {
         let py = ray.origin.y + t * ray.direction.y;
 
         if py <= self.apex.y && py >= (self.apex.y - self.height) {
-            return Some(t);
+            let hit_point = ray.compute_point(t);
+            let normal = self.compute_normal(&hit_point);
+
+            return Some(Hit {t: t, normal: normal});
         }
 
         None
     }
 
-    fn compute_slab_hit(&self, ray: &Ray) -> Option<f32> {
+    fn compute_slab_hit(&self, ray: &Ray) -> Option<Hit> {
         let center = Point {x: self.apex.x, y: self.apex.y - self.height, z: self.apex.z};
         let slab_normal = Vec3 {x: 0.0, y: -1.0, z: 0.0};
         let radius = self.height * self.half_angle.tanh();
         let plane_hit = compute_plane_hit(&center, &slab_normal, ray)?;
-        let hit_point = ray.compute_point(plane_hit);
+        let hit_point = ray.compute_point(plane_hit.t);
 
         if (&hit_point - &center).norm_squared() < radius.powi(2) {
             Some(plane_hit)
@@ -167,24 +181,6 @@ impl Cone {
 
     fn lies_on_slab(&self, point: &Point) -> bool {
         (point.y - (self.apex.y - self.height)).abs() < 0.000001
-    }
-}
-
-
-impl Surface for Cone {
-    fn compute_hit(&self, ray: &Ray, debug: bool) -> Option<f32> {
-        let cone_hit = self.compute_cone_hit(ray);
-        let slab_hit = self.compute_slab_hit(ray);
-
-        if slab_hit.is_some() {
-            if cone_hit.is_some() {
-                Some(slab_hit.unwrap().min(cone_hit.unwrap()))
-            } else {
-                slab_hit
-            }
-        } else {
-            cone_hit
-        }
     }
 
     fn compute_normal(&self, point: &Point) -> Vec3 {
@@ -197,6 +193,27 @@ impl Surface for Cone {
                 y: -2.0 * s * (point.y - self.apex.y),
                 z: 2.0 * (point.z - self.apex.z),
             }).normalize()
+        }
+    }
+}
+
+
+impl Surface for Cone {
+    fn compute_hit(&self, ray: &Ray, debug: bool) -> Option<Hit> {
+        let cone_hit = self.compute_cone_hit(ray);
+        let slab_hit = self.compute_slab_hit(ray);
+
+        if slab_hit.is_some() {
+            if cone_hit.is_some() {
+                let slab_hit = slab_hit.unwrap();
+                let cone_hit = cone_hit.unwrap();
+
+                Some(if slab_hit.t < cone_hit.t { slab_hit } else { cone_hit })
+            } else {
+                slab_hit
+            }
+        } else {
+            cone_hit
         }
     }
 
@@ -255,7 +272,7 @@ fn select_smallest_positive_root(roots: (f32, Option<f32>)) -> Option<f32> {
 }
 
 #[inline]
-fn compute_plane_hit(bias: &Point, normal: &Vec3, ray: &Ray) -> Option<f32> {
+fn compute_plane_hit(bias: &Point, normal: &Vec3, ray: &Ray) -> Option<Hit> {
     let denom = normal.dot_product(&ray.direction);
 
     if denom == 0.0 {
@@ -266,7 +283,7 @@ fn compute_plane_hit(bias: &Point, normal: &Vec3, ray: &Ray) -> Option<f32> {
     let t = num / denom;
 
     if t >= MIN_RAY_T {
-        Some(t)
+        Some(Hit {t: t, normal: normal.clone()})
     } else {
         None
     }

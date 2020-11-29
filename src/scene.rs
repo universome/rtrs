@@ -1,5 +1,5 @@
 use crate::camera::{Camera};
-use crate::surface::surface::{Surface};
+use crate::surface::surface::{Surface, Hit};
 use crate::basics::*;
 
 
@@ -20,10 +20,10 @@ impl Scene {
         let mut min_t = f32::INFINITY;
 
         for (idx, object) in self.objects.iter().enumerate() {
-            if let Some(t) = object.compute_hit(&ray, false) {
-                if t < min_t {
+            if let Some(hit) = object.compute_hit(&ray, false) {
+                if hit.t < min_t {
                     closest_obj_idx = Some(idx);
-                    min_t = t;
+                    min_t = hit.t;
                 }
             }
         }
@@ -34,26 +34,24 @@ impl Scene {
     pub fn compute_pixel(&self, i: u32, j: u32, _debug: bool) -> Color {
         // let closest_obj = self.get_object_at_pixel(i, j);
         let ray_world = self.camera.generate_ray(i, j);
-        let mut closest_obj = None;
-        let mut min_t_world = f32::INFINITY;
+        let mut hit = Hit::inf();
 
         for object in self.objects.iter() {
-            if let Some(t_world) = object.compute_hit(&ray_world, _debug) {
-                if t_world < min_t_world {
-                    closest_obj = Some((object, t_world));
-                    min_t_world = t_world;
+            if let Some(another_hit) = object.compute_hit(&ray_world, _debug) {
+                if another_hit.t < hit.t {
+                    hit = another_hit;
                 }
             }
         }
 
-        if closest_obj.is_none() {
+        if hit.t == f32::INFINITY {
             return self.background_color.clone();
         }
 
-        let (obj, min_t_world) = closest_obj.unwrap();
-        let mut color = &obj.get_color() * self.ambient_strength;
-        let hit_point_world = ray_world.compute_point(min_t_world); // TODO: do not recompute the hit hit_point
-        let normal_world = obj.compute_normal(&hit_point_world);
+        // let mut color = &obj.get_color() * self.ambient_strength;
+        let mut color = Color {r: 0.5, g: 0.5, b: 0.5};
+        let hit_point_world = ray_world.compute_point(hit.t); // TODO: do not recompute the hit hit_point
+        // println!("hit_point_world: {:?}", hit_point_world);
 
         for light_world in self.lights.iter() {
             let distance_to_light = (&light_world.location - &hit_point_world).norm();
@@ -65,17 +63,21 @@ impl Scene {
 
             if self.objects.iter()
                 // .filter(|o| !ptr::eq(*o, &*obj)) TODO: why did we need this?
-                .any(|o| o.compute_hit(&shadow_ray, _debug).filter(|t| t <= &distance_to_light).is_some()) {
+                .any(|o| o.compute_hit(&shadow_ray, _debug)
+                          .filter(|hit| hit.t < distance_to_light)
+                          .is_some()) {
+                    // println!("Is in shadow");
                     continue;
             }
 
-            let diffuse_cos = normal_world.dot_product(&light_dir.normalize()).max(0.0);
+            let diffuse_cos = hit.normal.dot_product(&light_dir.normalize()).max(0.0);
             let diffuse_light_color = &light_world.color * (diffuse_cos * self.diffuse_strength);
 
             // Specular light component
             let eye_dir = (&self.camera.origin - &hit_point_world).normalize();
             let half_vector = (eye_dir + light_dir).normalize();
-            let spec_strength = obj.get_specular_strength() * normal_world.dot_product(&half_vector).max(0.0).powf(64.0);
+            // let spec_strength = obj.get_specular_strength() * hit.normal.dot_product(&half_vector).max(0.0).powf(64.0);
+            let spec_strength = 0.2 * hit.normal.dot_product(&half_vector).max(0.0).powf(64.0);
             let spec_color = (&Color {r: 1.0, g: 1.0, b: 1.0}) * spec_strength;
 
             color = (&(&color + &diffuse_light_color) + &spec_color).clamp();

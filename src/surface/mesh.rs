@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use tobj::Model;
 
-use crate::surface::surface::{Surface};
+use crate::surface::surface::{Surface, Hit};
 use crate::basics::*;
 use crate::matrix::{Mat3, AffineMat3};
 use crate::surface::MIN_RAY_T;
@@ -23,17 +23,14 @@ pub struct Triangle {
 
 
 impl Surface for Triangle {
-    fn compute_hit(&self, ray: &Ray, debug: bool) -> Option<f32> {
+    fn compute_hit(&self, ray: &Ray, debug: bool) -> Option<Hit> {
         let v0 = &self.positions[self.vertices.0];
         let v1 = &self.positions[self.vertices.1];
         let v2 = &self.positions[self.vertices.2];
         let edge_01 = v1 - v0;
         let edge_02 = v2 - v0;
-        // println!("Edges: {:?} and {:?}", edge_01, edge_02);
         let face_normal = &edge_01.cross_product(&edge_02).normalize();
         let t_denom = face_normal.dot_product(&ray.direction);
-
-        // println!("face_normal: {:?}", face_normal);
 
         if t_denom.abs() < 0.000001 {
             // The ray and the triangle are parallel
@@ -59,12 +56,15 @@ impl Surface for Triangle {
             return None;
         }
 
-        Some(t)
+        Some(Hit {
+            t: t,
+            normal: face_normal.clone()
+        })
     }
 
-    fn compute_normal(&self, point: &Point) -> Vec3 {
-        Vec3 {x: 0.0, y: -1.0, z: 0.0}
-    }
+    // fn compute_normal(&self, point: &Point) -> Vec3 {
+    //     Vec3 {x: 0.0, y: -1.0, z: 0.0}
+    // }
 
     fn get_color(&self) -> Color { Color {r: 0.3, g: 0.3, b: 0.3} }
     fn get_specular_strength(&self) -> f32 { 0.5 }
@@ -122,25 +122,25 @@ impl TriangleMesh {
 
 
 impl Surface for TriangleMesh {
-    fn compute_hit(&self, ray: &Ray, debug: bool) -> Option<f32> {
-        let mut min_t = f32::INFINITY;
+    fn compute_hit(&self, ray: &Ray, debug: bool) -> Option<Hit> {
+        let mut closest_hit = Hit::inf();
 
         for triangle in self.triangles.iter() {
-            if let Some(t) = triangle.compute_hit(ray, debug) {
-                min_t = if t < min_t { t } else { min_t };
+            if let Some(hit) = triangle.compute_hit(ray, debug) {
+                closest_hit = if hit.t < closest_hit.t {hit} else {closest_hit};
             }
         }
 
-        if min_t < f32::INFINITY {
-            Some(min_t)
+        if closest_hit.t < f32::INFINITY {
+            Some(closest_hit)
         } else {
             None
         }
     }
 
-    fn compute_normal(&self, point: &Point) -> Vec3 {
-        Vec3 {x: 0.0, y: -1.0, z: 0.0}
-    }
+    // fn compute_normal(&self, point: &Point) -> Vec3 {
+    //     Vec3 {x: 0.0, y: -1.0, z: 0.0}
+    // }
 
     fn get_color(&self) -> Color { Color {r: 0.3, g: 0.3, b: 0.3} }
     fn get_specular_strength(&self) -> f32 { 0.5 }
@@ -188,8 +188,8 @@ mod mesh_tests {
 
     #[test]
     fn test_ray_mesh_intersection() {
-        let mesh = TriangleMesh::from_obj("resources/square.obj");
-        // let mesh = TriangleMesh::from_obj("resources/cube.obj");
+        // let mesh = TriangleMesh::from_obj("resources/square.obj");
+        let mesh = TriangleMesh::from_obj("resources/cube.obj");
         let ray = Ray {
             origin: Point {x: 0.0, y: 0.0, z: -1.0},
             direction: Vec3 {x: 0.0, y: 0.0, z: 1.0},

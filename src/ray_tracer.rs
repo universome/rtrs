@@ -336,18 +336,19 @@ fn setup_scene(render_options: &RenderOptions) -> Scene {
     );
 
     let lights = vec![Light {
-        location: (&lookat_transform * &render_options.transformations[4].translation).into(),
+        // location: (&lookat_transform * &render_options.transformations[4].translation).into(),
+        location: Point { x: 0.0, y: 10.0, z: 0.0},
         color: Color {r: 1.0, g: 1.0, b: 1.0},
     }];
 
-    // let plane = Plane::from_y(-1.4, Color {r: 0.5, g: 0.5, b: 0.5});
-    // let plane_transform = &lookat_transform * &render_options.transformations[0];
-    // let transformed_plane = TransformedSurface::new(plane_transform, plane);
+    let plane = Plane::from_y(-1.4, Color {r: 0.5, g: 0.5, b: 0.5});
+    let plane_transform = &lookat_transform * &render_options.transformations[0];
+    let transformed_plane = TransformedSurface::new(plane_transform, plane);
 
-    // let mut sphere_a = Sphere::new(Color {r: 0.0, g: 0.0, b: 1.0});
-    // sphere_a.specular_strength = render_options.specular_strengths[1];
-    // let sphere_a_transform = &lookat_transform * &render_options.transformations[1];
-    // let transformed_sphere_a = TransformedSurface::new(sphere_a_transform, sphere_a);
+    let mut sphere_a = Sphere::new(Color {r: 0.0, g: 0.0, b: 1.0});
+    sphere_a.specular_strength = render_options.specular_strengths[1];
+    let sphere_a_transform = &lookat_transform * &render_options.transformations[1];
+    let transformed_sphere_a = TransformedSurface::new(sphere_a_transform, sphere_a);
 
     // let sphere_b = Sphere::new(Color {r: 1.0, g: 0.0, b: 0.0});
     // let sphere_b_transform = &lookat_transform * &render_options.transformations[2];
@@ -380,7 +381,7 @@ fn setup_scene(render_options: &RenderOptions) -> Scene {
 
     Scene {
         objects: vec![
-            // Box::new(transformed_plane),
+            Box::new(transformed_plane),
             // Box::new(transformed_sphere_a),
             // Box::new(transformed_sphere_b),
             // Box::new(transformed_cone),
@@ -414,7 +415,7 @@ impl RenderOptions {
             transformations: [
                 AffineMat3::identity(),
                 AffineMat3 {
-                    transform_mat: &Mat3::identity() * 0.25,
+                    transform_mat: &Mat3::identity() * 1.0,
                     translation: Vec3::new(0.0, -0.5, 0.0),
                 },
                 AffineMat3 {
@@ -427,16 +428,16 @@ impl RenderOptions {
                 },
                 AffineMat3 {
                     transform_mat: Mat3::identity(),
-                    translation: Vec3::new(0.0, 5.0, 0.0),
+                    translation: Vec3::new(0.0, 10.0, 0.0),
                 }
             ],
         }
     }
 
     fn update_transformations_on_time(&mut self, time: f32) {
-        self.transformations[1].translation.x = (time * self.spheres_fly_speed).sin() * self.spheres_fly_radius;
-        self.transformations[1].translation.z = (time * self.spheres_fly_speed).cos() * self.spheres_fly_radius;
-        self.transformations[2].translation.x = -(time * self.spheres_fly_speed).sin() * self.spheres_fly_radius;
-        self.transformations[2].translation.z = -(time * self.spheres_fly_speed).cos() * self.spheres_fly_radius;
+        // self.transformations[1].translation.x = (time * self.spheres_fly_speed).sin() * self.spheres_fly_radius;
+        // self.transformations[1].translation.z = (time * self.spheres_fly_speed).cos() * self.spheres_fly_radius;
+        // self.transformations[2].translation.x = -(time * self.spheres_fly_speed).sin() * self.spheres_fly_radius;
+        // self.transformations[2].translation.z = -(time * self.spheres_fly_speed).cos() * self.spheres_fly_radius;
     }
 }
