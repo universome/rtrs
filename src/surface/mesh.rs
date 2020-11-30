@@ -20,7 +20,7 @@ pub struct Triangle {
     indices: (usize, usize, usize), // Vertex ids
     positions: Arc<Vec<Point>>,
     calculated_normals: Arc<Vec<Vec3>>,
-    // normals: Arc<Vec<Normal>>
+    normals: Arc<Vec<Vec3>>
 }
 
 
@@ -69,10 +69,24 @@ impl Surface for Triangle {
             return None;
         }
 
-        Some(Hit {
-            t: t,
-            normal: face_normal.clone()
-        })
+        let area = face_normal.norm() / 2.0;
+        let area_v0 = (v1 - v0).cross_product(&(hit_point - v0)).norm() / 2.0;
+        let area_v1 = (v2 - v1).cross_product(&(hit_point - v1)).norm() / 2.0;
+        let area_v2 = (v0 - v2).cross_product(&(hit_point - v2)).norm() / 2.0;
+        let bar_coords = (area_v0 / area, area_v1 / area, area_v2 / area);
+
+        let normal = (if self.normals.len() > 0 {
+            &self.normals[self.indices.0] * bar_coords.0 +
+            &self.normals[self.indices.1] * bar_coords.1 +
+            &self.normals[self.indices.2] * bar_coords.2
+        } else {
+            &self.calculated_normals[self.indices.0] * bar_coords.0 +
+            &self.calculated_normals[self.indices.1] * bar_coords.1 +
+            &self.calculated_normals[self.indices.2] * bar_coords.2
+        }).normalize();
+
+        Some(Hit {t, normal})
+        // Some(Hit {t: t, normal: face_normal.clone()})
     }
 
     // fn compute_normal(&self, point: &Point) -> Vec3 {
@@ -88,7 +102,7 @@ pub struct TriangleMesh {
     triangles: Vec<Triangle>,
     positions: Arc<Vec<Point>>,
     calculated_normals: Arc<Vec<Vec3>>,
-    normals: Option<Vec<Vec3>>,
+    normals: Arc<Vec<Vec3>>,
 }
 
 
@@ -98,6 +112,7 @@ impl TriangleMesh {
         let model = models[0].clone();
         let num_triangles = model.mesh.num_face_indices.len() as usize;
         let mut positions = vec![];
+        let mut normals = vec![];
 
         // We are going to convert a flattened array of [x1, y1, z1, x2, y2, z2, ...]
         // into an array of points [(x1, y1, z1), (x2, y2, z2), ...]
@@ -107,9 +122,18 @@ impl TriangleMesh {
                 model.mesh.positions[i * 3 + 1],
                 model.mesh.positions[i * 3 + 2]
             ));
+
+            if model.mesh.normals.len() > 0 {
+                normals.push(Vec3::new(
+                    model.mesh.normals[i * 3 + 0],
+                    model.mesh.normals[i * 3 + 1],
+                    model.mesh.normals[i * 3 + 2]
+                ));
+            }
         }
 
         let positions_arc = Arc::new(positions);
+        let normals_arc = Arc::new(normals);
         let mut triangles = vec![];
 
         for i in 0..num_triangles {
@@ -121,6 +145,7 @@ impl TriangleMesh {
                 ),
                 positions: positions_arc.clone(),
                 calculated_normals: Arc::new(vec![]),
+                normals: normals_arc.clone(),
             });
         }
 
@@ -146,7 +171,7 @@ impl TriangleMesh {
             positions: positions_arc,
             calculated_normals: calculated_normals_arc,
             triangles: triangles,
-            normals: None,
+            normals: normals_arc,
         }
     }
 }

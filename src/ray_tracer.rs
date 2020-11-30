@@ -374,8 +374,8 @@ fn setup_scene(render_options: &RenderOptions) -> Scene {
     //     .expect("A .obj file to print is required");
     // let (models, _) = tobj::load_obj(&obj_file, true).unwrap();
     // let mesh_surface = TriangleMesh::from_obj("resources/square.obj");
-    let mesh_surface = TriangleMesh::from_obj("resources/cube.obj");
-    // let mesh_surface = TriangleMesh::from_obj("resources/teapot.obj");
+    // let mesh_surface = TriangleMesh::from_obj("resources/cube.obj");
+    let mesh_surface = TriangleMesh::from_obj("resources/teapot.obj");
     let mesh_transform = &lookat_transform * &render_options.transformations[1];
     let transformed_mesh = TransformedSurface::new(mesh_transform, mesh_surface);
 
@@ -415,7 +415,8 @@ impl RenderOptions {
             transformations: [
                 AffineMat3::identity(),
                 AffineMat3 {
-                    transform_mat: &Mat3::identity() * 1.0,
+                    // transform_mat: &Mat3::identity() * 1.0,
+                    transform_mat: &Mat3::identity() * 0.1,
                     translation: Vec3::new(0.0, -0.5, 0.0),
                 },
                 AffineMat3 {
