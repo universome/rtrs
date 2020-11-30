@@ -3,6 +3,7 @@ use std::sync::Arc;
 use tobj::Model;
 
 use crate::surface::surface::{Surface, Hit};
+use crate::surface::quadrics::{Sphere};
 use crate::basics::*;
 use crate::matrix::{Mat3, AffineMat3};
 use crate::surface::MIN_RAY_T;
@@ -33,6 +34,12 @@ impl Triangle {
         let edge_02 = v2 - v0;
 
         edge_01.cross_product(&edge_02).normalize()
+    }
+
+    pub fn compute_center(&self) -> Point {
+        (&(Vec3::from(&self.positions[self.indices.0])
+        + Vec3::from(&self.positions[self.indices.1])
+        + Vec3::from(&self.positions[self.indices.0])) * (1.0 / 3.0)).into()
     }
 }
 
@@ -98,16 +105,19 @@ impl Surface for Triangle {
 }
 
 #[derive(Debug, Clone)]
+// pub struct TriangleMesh {
 pub struct TriangleMesh {
     triangles: Vec<Triangle>,
     positions: Arc<Vec<Point>>,
     calculated_normals: Arc<Vec<Vec3>>,
     normals: Arc<Vec<Vec3>>,
+    bvh: Option<BoundingVolumeHierarchy>,
 }
 
 
+// impl TriangleMesh {
 impl TriangleMesh {
-    pub fn from_obj(obj_file: &str) -> TriangleMesh {
+    pub fn from_obj(obj_file: &str) -> Self {
         let (models, _) = tobj::load_obj(&obj_file, true).unwrap();
         let model = models[0].clone();
         let num_triangles = model.mesh.num_face_indices.len() as usize;
@@ -168,17 +178,15 @@ impl TriangleMesh {
         }
 
         TriangleMesh {
+            bvh: Some(BoundingVolumeHierarchy::from_triangles_list(triangles.clone())),
             positions: positions_arc,
             calculated_normals: calculated_normals_arc,
             triangles: triangles,
             normals: normals_arc,
         }
     }
-}
 
-
-impl Surface for TriangleMesh {
-    fn compute_hit(&self, ray: &Ray, debug: bool) -> Option<Hit> {
+    fn compute_slow_hit(&self, ray: &Ray, debug: bool) -> Option<Hit> {
         let mut closest_hit = Hit::inf();
 
         for triangle in self.triangles.iter() {
@@ -193,6 +201,18 @@ impl Surface for TriangleMesh {
             None
         }
     }
+}
+
+
+// impl Surface for TriangleMesh {
+impl Surface for TriangleMesh {
+    fn compute_hit(&self, ray: &Ray, debug: bool) -> Option<Hit> {
+        if self.bvh.is_some() {
+            self.bvh.as_ref().unwrap().compute_hit(ray, debug)
+        } else {
+            self.compute_slow_hit(ray, debug)
+        }
+    }
 
     // fn compute_normal(&self, point: &Point) -> Vec3 {
     //     Vec3 {x: 0.0, y: -1.0, z: 0.0}
@@ -201,6 +221,119 @@ impl Surface for TriangleMesh {
     fn get_color(&self) -> Color { Color {r: 0.3, g: 0.3, b: 0.3} }
     fn get_specular_strength(&self) -> f32 { 0.5 }
 }
+
+#[derive(Debug, Clone)]
+struct BoundingVolumeHierarchy {
+    triangle_left: Option<Triangle>,
+    triangle_right: Option<Triangle>,
+    bvh_left: Option<Box<BoundingVolumeHierarchy>>,
+    bvh_right: Option<Box<BoundingVolumeHierarchy>>,
+    bbox: Sphere,
+}
+
+
+impl BoundingVolumeHierarchy {
+    pub fn from_triangles_list(triangles: Vec<Triangle>) -> Self {
+        assert!(triangles.len() > 0);
+
+        if triangles.len() == 1 {
+            return BoundingVolumeHierarchy {
+                bbox: BoundingVolumeHierarchy::compute_sphere_from_triangles(&triangles),
+                triangle_left: Some(triangles[0].clone()),
+                triangle_right: None,
+                bvh_left: None,
+                bvh_right: None,
+            };
+        }
+
+        if triangles.len() == 2 {
+            return BoundingVolumeHierarchy {
+                bbox: BoundingVolumeHierarchy::compute_sphere_from_triangles(&triangles),
+                triangle_left: Some(triangles[0].clone()),
+                triangle_right: Some(triangles[1].clone()),
+                bvh_left: None,
+                bvh_right: None,
+            };
+        }
+
+        let sphere = BoundingVolumeHierarchy::compute_sphere_from_triangles(&triangles);
+        let mut triangles = triangles;
+        triangles.sort_by(|t1, t2| t1.compute_center().x.partial_cmp(&t2.compute_center().x).unwrap());
+        let (triangles_left, triangles_right) = triangles.split_at(triangles.len() / 2);
+
+        let triangle_left = if triangles_left.len() == 1 {Some(triangles_left[0].clone())} else {None};
+        let bvh_left = if triangles_left.len() == 1 {None} else {
+            Some(Box::new(BoundingVolumeHierarchy::from_triangles_list(triangles_left.to_vec())))};
+        let triangle_right = if triangles_right.len() == 1 {Some(triangles_right[0].clone())} else {None};
+        let bvh_right = if triangles_right.len() == 1 {None} else {
+            Some(Box::new(BoundingVolumeHierarchy::from_triangles_list(triangles_right.to_vec())))};
+
+        BoundingVolumeHierarchy  {
+            triangle_left: triangle_left,
+            triangle_right: triangle_right,
+            bvh_left: bvh_left,
+            bvh_right: bvh_right,
+            bbox: sphere,
+        }
+    }
+
+    pub fn compute_sphere_from_triangles(triangles: &Vec<Triangle>) -> Sphere {
+        let mut center = Point::zero();
+        for i in 0..triangles.len() {
+            let triangle_center = triangles[i].compute_center();
+            center.x += triangle_center.x * (1.0 / triangles.len() as f32);
+            center.y += triangle_center.y * (1.0 / triangles.len() as f32);
+            center.z += triangle_center.z * (1.0 / triangles.len() as f32);
+        }
+
+        let max_distance = triangles.iter().map(|t| -> f32 {
+            0.0_f32
+                .max((&t.positions[t.indices.0] - &center).norm())
+                .max((&t.positions[t.indices.1] - &center).norm())
+                .max((&t.positions[t.indices.2] - &center).norm())
+        }).fold(0.0, |x: f32, y: f32| x.max(y));
+
+        Sphere::from_position(max_distance + 0.001, center)
+    }
+}
+
+
+impl Surface for BoundingVolumeHierarchy {
+    fn compute_hit(&self, ray: &Ray, debug: bool) -> Option<Hit> {
+        self.bbox.compute_hit(ray, debug)?;
+
+        let left_hit = if self.triangle_left.is_some() {
+            self.triangle_left.as_ref().unwrap().compute_hit(ray, debug)
+        } else if self.bvh_left.is_some() {
+            (*self.bvh_left.as_ref().unwrap()).compute_hit(ray, debug)
+        } else {
+            None
+        };
+        let right_hit = if self.triangle_right.is_some() {
+            self.triangle_right.as_ref().unwrap().compute_hit(ray, debug)
+        } else if self.bvh_right.is_some() {
+            (*self.bvh_right.as_ref().unwrap()).compute_hit(ray, debug)
+        } else {
+            None
+        };
+
+        if left_hit.is_some() {
+            if right_hit.is_some() {
+                let left_hit = left_hit.unwrap();
+                let right_hit = right_hit.unwrap();
+
+                Some(if left_hit.t < right_hit.t { left_hit } else { right_hit })
+            } else {
+                left_hit
+            }
+        } else {
+            right_hit
+        }
+    }
+    fn get_color(&self) -> Color { Color {r: 0.3, g: 0.3, b: 0.3} }
+    fn get_specular_strength(&self) -> f32 { 0.5 }
+}
+
 
 #[inline]
 fn is_on_the_right(hit_point: &Point, from: &Point, to: &Point, normal: &Vec3) -> bool {

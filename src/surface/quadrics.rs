@@ -23,6 +23,15 @@ impl Sphere {
         }
     }
 
+    pub fn from_position(radius: f32, center: Point) -> Self {
+        Sphere {
+            center: center,
+            radius: radius,
+            color: Color::zero(),
+            specular_strength: 0.0,
+        }
+    }
+
     fn compute_normal(&self, point: &Point) -> Vec3 {
         &(point - &self.center) * (1. / self.radius)
     }

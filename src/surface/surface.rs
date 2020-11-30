@@ -1,8 +1,10 @@
 use std::marker::Sync;
 use std::fmt::Debug;
+// use std::cmp::Ordering;
 
 use crate::basics::*;
 use crate::matrix::{Mat3, AffineMat3};
+
 
 #[derive(Debug, Clone)]
 pub struct Hit {
@@ -21,13 +23,24 @@ impl Hit {
 }
 
 
+// macro_rules! impl_cmp_for_hit {
+//     ($type_lhs:ty, $type_rhs:ty) => {
+//         impl Ord for $type_lhs {
+//             fn eq(&self, other: $type_rhs) -> Ordering {
+//                 self.t.cmp(other.t)
+//             }
+//         }
+//     };
+// }
+// impl_cmp_for_hit!(Hit, Hit);
+
+
 pub trait Surface: Debug + Sync {
     fn compute_hit(&self, ray: &Ray, debug: bool) -> Option<Hit>;
     // fn compute_normal(&self, point: &Point) -> Vec3;
     fn get_color(&self) -> Color;
     fn get_specular_strength(&self) -> f32;
 }
-
 
 
 #[derive(Debug, Clone)]

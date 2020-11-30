@@ -125,21 +125,25 @@ impl ops::Index<usize> for Vec3 {
     }
 }
 
-macro_rules! impl_add_for_vec3 {
+macro_rules! impl_add_vec3 {
     ($type_lhs:ty, $type_rhs:ty) => {
         impl ops::Add<$type_rhs> for $type_lhs {
             type Output = Vec3;
 
             fn add(self, other: $type_rhs) -> Vec3 {
-                Vec3 {x: self.x + other.x, y: self.y + other.y, z: self.z + other.z}
+                Vec3 {
+                    x: self.x + other.x,
+                    y: self.y + other.y,
+                    z: self.z + other.z,
+                }
             }
         }
     };
 }
-impl_add_for_vec3!(Vec3, Vec3);
-impl_add_for_vec3!(Vec3, &Vec3);
-impl_add_for_vec3!(&Vec3, Vec3);
-impl_add_for_vec3!(&Vec3, &Vec3);
+impl_add_vec3!(Vec3, Vec3);
+impl_add_vec3!(Vec3, &Vec3);
+impl_add_vec3!(&Vec3, Vec3);
+impl_add_vec3!(&Vec3, &Vec3);
 
 
 impl ops::Mul<f32> for &Vec3 {
@@ -184,6 +188,7 @@ impl Point {
     }
 }
 
+
 impl ops::Mul<f32> for &Point {
     type Output = Point;
 
@@ -195,19 +200,27 @@ impl ops::Mul<f32> for &Point {
         }
     }
 }
+macro_rules! impl_sub_for_point {
+    ($type_lhs:ty, $type_rhs:ty) => {
+        impl ops::Sub<$type_rhs> for $type_lhs {
+            type Output = Vec3;
 
-
-impl ops::Sub<&Point> for &Point {
-    type Output = Vec3;
-
-    fn sub(self, other: &Point) -> Vec3 {
-        Vec3 {
-            x: self.x - other.x,
-            y: self.y - other.y,
-            z: self.z - other.z,
+            fn sub(self, other: $type_rhs) -> Vec3 {
+                Vec3 {
+                    x: self.x - other.x,
+                    y: self.y - other.y,
+                    z: self.z - other.z,
+                }
+            }
         }
-    }
+    };
 }
+
+impl_sub_for_point!(Point, Point);
+impl_sub_for_point!(Point, &Point);
+impl_sub_for_point!(&Point, Point);
+impl_sub_for_point!(&Point, &Point);
+
 
 impl ops::Add<&Vec3> for &Point {
     type Output = Point;
