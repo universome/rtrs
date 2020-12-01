@@ -275,6 +275,8 @@ impl From<Vec3> for Point {
 pub struct Light {
     pub location: Point,
     pub color: Color,
+    pub right: Vec3,
+    pub top: Vec3,
 }
 
 

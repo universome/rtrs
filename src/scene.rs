@@ -1,4 +1,5 @@
 use rand::Rng;
+use rand::seq::SliceRandom;
 
 use crate::camera::{Camera};
 use crate::surface::surface::{Surface, Hit};
@@ -33,7 +34,7 @@ impl Scene {
         closest_obj_idx
     }
 
-    pub fn compute_ray_color(&self, ray_world: &Ray, _debug: bool) -> Color {
+    pub fn compute_ray_color(&self, ray_world: &Ray, light_shift: Option<(f32, f32)>, _debug: bool) -> Color {
         let mut hit = Hit::inf();
 
         for object in self.objects.iter() {
@@ -54,18 +55,26 @@ impl Scene {
         // println!("hit_point_world: {:?}", hit_point_world);
 
         for light_world in self.lights.iter() {
-            let distance_to_light = (&light_world.location - &hit_point_world).norm();
-            let light_dir = (&light_world.location - &hit_point_world).normalize();
+            let light_location = if light_shift.is_some() {
+                let (shift_right, shift_top) = light_shift.unwrap();
+
+                &light_world.location + &(&light_world.right * shift_right + &light_world.top * shift_top)
+            } else {
+                light_world.location.clone()
+            };
+
+            let distance_to_light = (&light_location - &hit_point_world).norm();
+            let light_dir = (&light_location - &hit_point_world).normalize();
             let shadow_ray = Ray {
-                origin: &hit_point_world.clone() + &(&light_dir.clone() * 0.0001),
+                origin: &hit_point_world + &(&light_dir.clone() * 0.0001),
                 direction: light_dir.clone(),
             };
 
             if self.objects.iter()
                 // .filter(|o| !ptr::eq(*o, &*obj)) TODO: why did we need this?
                 .any(|o| o.compute_hit(&shadow_ray, _debug)
-                          .filter(|hit| hit.t < distance_to_light)
-                          .is_some()) {
+                        .filter(|hit| hit.t < distance_to_light)
+                        .is_some()) {
                     // println!("Is in shadow");
                     continue;
             }
@@ -89,21 +98,37 @@ impl Scene {
     pub fn compute_pixel(&self, i: u32, j: u32, _debug: bool) -> Color {
         // let shifts = (0..25).map(|_| rng.gen::<f32>()).collect::<Vec<f32>>();
         let rays;
-        if false {
-            let mut rng = rand::thread_rng();
-            rays = iproduct!(0..5, 0..5)
+        let NUM_SAMPLES = 5;
+        let mut rng = rand::thread_rng();
+
+        if true {
+            rays = iproduct!(0..NUM_SAMPLES, 0..NUM_SAMPLES)
                 .map(|p: (i32, i32)| self.camera.generate_ray(
-                    (i as f32) + (p.0 as f32) / 5.0 + rng.gen::<f32>(),
-                    (j as f32) + (p.1 as f32) / 5.0 + rng.gen::<f32>()
+                    (i as f32) + (p.0 as f32) / NUM_SAMPLES as f32 + rng.gen::<f32>(),
+                    (j as f32) + (p.1 as f32) / NUM_SAMPLES as f32 + rng.gen::<f32>()
                 ))
                 .collect::<Vec<Ray>>();
         } else {
             rays = vec![self.camera.generate_ray(i as f32 + 0.5, j as f32 + 0.5)]
         }
 
+        let mut light_shifts = if true {
+            iproduct!(0..NUM_SAMPLES, 0..NUM_SAMPLES)
+                .map(|p: (i32, i32)| Some((
+                    (p.0 as f32) / NUM_SAMPLES as f32 + rng.gen::<f32>(),
+                    (p.1 as f32) / NUM_SAMPLES as f32 + rng.gen::<f32>()
+                )))
+                .collect::<Vec<Option<(f32, f32)>>>()
+        } else {
+            vec![None; 25]
+        };
+
+        light_shifts.shuffle(&mut rng);
+
         rays
             .iter()
-            .map(|ray| &self.compute_ray_color(ray, _debug) * (1.0 / rays.len() as f32))
+            .enumerate()
+            .map(|(i, ray)| &self.compute_ray_color(ray, light_shifts[i], _debug) * (1.0 / rays.len() as f32))
             .fold(Color::zero(), |c1, c2| &c1 + &c2)
     }
 }

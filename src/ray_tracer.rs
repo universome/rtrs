@@ -341,6 +341,8 @@ fn setup_scene(render_options: &RenderOptions) -> Scene {
         // location: (&lookat_transform * &render_options.transformations[4].translation).into(),
         location: Point { x: 0.0, y: 10.0, z: 0.0},
         color: Color {r: 1.0, g: 1.0, b: 1.0},
+        right: Vec3::new(0.5, 0.0, 0.0),
+        top: Vec3::new(0.0, 0.0, 0.5),
     }];
 
     let plane = Plane::from_y(-1.4, Color {r: 0.5, g: 0.5, b: 0.5});
@@ -424,7 +426,7 @@ impl RenderOptions {
                 AffineMat3::identity(),
                 AffineMat3 {
                     // transform_mat: &Mat3::identity() * 1.0,
-                    transform_mat: &Mat3::identity() * 0.1,
+                    transform_mat: &Mat3::identity() * 0.5,
                     translation: Vec3::new(0.0, -0.5, 0.0),
                 },
                 AffineMat3 {
