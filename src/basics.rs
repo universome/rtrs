@@ -112,15 +112,19 @@ impl Vec3 {
 }
 
 
-impl ops::Index<usize> for Vec3 {
-    type Output = f32;
+macro_rules! impl_index_for_3d_struct {
+    ($type:ty) => {
+        impl ops::Index<usize> for $type {
+            type Output = f32;
 
-    fn index(&self, idx: usize) -> &f32 {
-        match idx {
-            0 => &self.x,
-            1 => &self.y,
-            2 => &self.z,
-            _ => panic!("Value {} is out of bounds for Vec3", idx),
+            fn index(&self, idx: usize) -> &f32 {
+                match idx {
+                    0 => &self.x,
+                    1 => &self.y,
+                    2 => &self.z,
+                    _ => panic!("Value {} is out of bounds", idx),
+                }
+            }
         }
     }
 }
@@ -144,6 +148,7 @@ impl_add_vec3!(Vec3, Vec3);
 impl_add_vec3!(Vec3, &Vec3);
 impl_add_vec3!(&Vec3, Vec3);
 impl_add_vec3!(&Vec3, &Vec3);
+impl_index_for_3d_struct!(Vec3);
 
 
 impl ops::Mul<f32> for &Vec3 {
@@ -188,6 +193,7 @@ impl Point {
     }
 }
 
+impl_index_for_3d_struct!(Point);
 
 impl ops::Mul<f32> for &Point {
     type Output = Point;

@@ -259,6 +259,7 @@ fn view(app: &App, state: &State, frame: Frame) {
     let start = Instant::now();
     let img = render_state(state);
     let duration = start.elapsed();
+    println!("Rending took time: {:?}", duration);
 
     unsafe {
         if NUM_FRAMES_SINCE_LAST_SEC == 0 && LAST_SEC % 10 == 0 {
@@ -351,9 +352,9 @@ fn setup_scene(render_options: &RenderOptions) -> Scene {
     // let sphere_a_transform = &lookat_transform * &render_options.transformations[1];
     // let transformed_sphere_a = TransformedSurface::new(sphere_a_transform, sphere_a);
 
-    let mut aabb = AxisAlignedBox {min_corner: Point::zero(), max_corner: &Point::zero() + 1.0};
-    let aabb_transform = &lookat_transform * &render_options.transformations[1];
-    let transformed_aabb = TransformedSurface::new(aabb_transform, aabb);
+    // let mut aabb = AxisAlignedBox {min_corner: Point::zero(), max_corner: &Point::zero() + 1.0};
+    // let aabb_transform = &lookat_transform * &render_options.transformations[1];
+    // let transformed_aabb = TransformedSurface::new(aabb_transform, aabb);
 
     // let sphere_b = Sphere::new(Color {r: 1.0, g: 0.0, b: 0.0});
     // let sphere_b_transform = &lookat_transform * &render_options.transformations[2];
@@ -380,6 +381,7 @@ fn setup_scene(render_options: &RenderOptions) -> Scene {
     // let (models, _) = tobj::load_obj(&obj_file, true).unwrap();
     // let mesh_surface = TriangleMesh::from_obj("resources/square.obj");
     // let mesh_surface = TriangleMesh::from_obj("resources/cube.obj");
+    println!("Loading mesh...");
     let mesh_surface = TriangleMesh::from_obj("resources/teapot.obj");
     let mesh_transform = &lookat_transform * &render_options.transformations[1];
     let transformed_mesh = TransformedSurface::new(mesh_transform, mesh_surface);
@@ -387,11 +389,11 @@ fn setup_scene(render_options: &RenderOptions) -> Scene {
     Scene {
         objects: vec![
             Box::new(transformed_plane),
-            Box::new(transformed_aabb),
+            // Box::new(transformed_aabb),
             // Box::new(transformed_sphere_a),
             // Box::new(transformed_sphere_b),
             // Box::new(transformed_cone),
-            // Box::new(transformed_mesh),
+            Box::new(transformed_mesh),
         ],
         camera: Camera::from_z_position(-1.0, render_options.fov, render_options.projection_type, WIDTH, HEIGHT),
         background_color: Color {r: 0.204, g: 0.596, b: 0.86},

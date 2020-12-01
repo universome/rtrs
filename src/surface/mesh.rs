@@ -3,9 +3,9 @@ use std::sync::Arc;
 use tobj::Model;
 
 use crate::surface::surface::{Surface, Hit};
-use crate::surface::quadrics::{Sphere};
+use crate::surface::quadrics::Sphere;
+use crate::surface::aabb::AxisAlignedBox;
 use crate::basics::*;
-use crate::matrix::{Mat3, AffineMat3};
 use crate::surface::MIN_RAY_T;
 
 // #[derive(Debug, Clone)]
@@ -40,6 +40,18 @@ impl Triangle {
         (&(Vec3::from(&self.positions[self.indices.0])
         + Vec3::from(&self.positions[self.indices.1])
         + Vec3::from(&self.positions[self.indices.0])) * (1.0 / 3.0)).into()
+    }
+
+    pub fn min_dim(&self, idx: usize) -> f32 {
+        self.positions[self.indices.0][idx]
+            .min(self.positions[self.indices.1][idx])
+            .min(self.positions[self.indices.2][idx])
+    }
+
+    pub fn max_dim(&self, idx: usize) -> f32 {
+        self.positions[self.indices.0][idx]
+            .max(self.positions[self.indices.1][idx])
+            .max(self.positions[self.indices.2][idx])
     }
 }
 
@@ -228,7 +240,8 @@ struct BoundingVolumeHierarchy {
     triangle_right: Option<Triangle>,
     bvh_left: Option<Box<BoundingVolumeHierarchy>>,
     bvh_right: Option<Box<BoundingVolumeHierarchy>>,
-    bbox: Sphere,
+    sphere: Sphere,
+    bbox: AxisAlignedBox,
 }
 
 
@@ -238,7 +251,8 @@ impl BoundingVolumeHierarchy {
 
         if triangles.len() == 1 {
             return BoundingVolumeHierarchy {
-                bbox: BoundingVolumeHierarchy::compute_sphere_from_triangles(&triangles),
+                sphere: BoundingVolumeHierarchy::compute_sphere_from_triangles(&triangles),
+                bbox: BoundingVolumeHierarchy::compute_bbox_from_triangles(&triangles),
                 triangle_left: Some(triangles[0].clone()),
                 triangle_right: None,
                 bvh_left: None,
@@ -248,7 +262,8 @@ impl BoundingVolumeHierarchy {
 
         if triangles.len() == 2 {
             return BoundingVolumeHierarchy {
-                bbox: BoundingVolumeHierarchy::compute_sphere_from_triangles(&triangles),
+                sphere: BoundingVolumeHierarchy::compute_sphere_from_triangles(&triangles),
+                bbox: BoundingVolumeHierarchy::compute_bbox_from_triangles(&triangles),
                 triangle_left: Some(triangles[0].clone()),
                 triangle_right: Some(triangles[1].clone()),
                 bvh_left: None,
@@ -257,6 +272,7 @@ impl BoundingVolumeHierarchy {
         }
 
         let sphere = BoundingVolumeHierarchy::compute_sphere_from_triangles(&triangles);
+        let bbox = BoundingVolumeHierarchy::compute_bbox_from_triangles(&triangles);
         let mut triangles = triangles;
         triangles.sort_by(|t1, t2| t1.compute_center().x.partial_cmp(&t2.compute_center().x).unwrap());
         let (triangles_left, triangles_right) = triangles.split_at(triangles.len() / 2);
@@ -273,7 +289,8 @@ impl BoundingVolumeHierarchy {
             triangle_right: triangle_right,
             bvh_left: bvh_left,
             bvh_right: bvh_right,
-            bbox: sphere,
+            sphere: sphere,
+            bbox: bbox,
         }
     }
 
@@ -294,6 +311,25 @@ impl BoundingVolumeHierarchy {
         }).fold(0.0, |x: f32, y: f32| x.max(y));
 
         Sphere::from_position(max_distance + 0.001, center)
+    }
+
+    pub fn compute_bbox_from_triangles(triangles: &Vec<Triangle>) -> AxisAlignedBox {
+        let mut min = &Point::zero() + f32::INFINITY;
+        let mut max = &Point::zero() + (-f32::INFINITY);
+
+        for i in 0..triangles.len() {
+            min.x = min.x.min(triangles[i].min_dim(0));
+            min.y = min.y.min(triangles[i].min_dim(1));
+            min.z = min.z.min(triangles[i].min_dim(2));
+            max.x = max.x.max(triangles[i].max_dim(0));
+            max.y = max.y.max(triangles[i].max_dim(1));
+            max.z = max.z.max(triangles[i].max_dim(2));
+        }
+
+        AxisAlignedBox {
+            min_corner: &min + (-0.00001),
+            max_corner: &max + 0.00001,
+        }
     }
 }
 
