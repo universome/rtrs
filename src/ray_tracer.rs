@@ -347,10 +347,10 @@ fn setup_scene(render_options: &RenderOptions) -> Scene {
     let plane_transform = &lookat_transform * &render_options.transformations[0];
     let transformed_plane = TransformedSurface::new(plane_transform, plane);
 
-    // let mut sphere_a = Sphere::new(Color {r: 0.0, g: 0.0, b: 1.0});
-    // sphere_a.specular_strength = render_options.specular_strengths[1];
-    // let sphere_a_transform = &lookat_transform * &render_options.transformations[1];
-    // let transformed_sphere_a = TransformedSurface::new(sphere_a_transform, sphere_a);
+    let mut sphere_a = Sphere::new(Color {r: 0.0, g: 0.0, b: 1.0});
+    sphere_a.specular_strength = render_options.specular_strengths[1];
+    let sphere_a_transform = &lookat_transform * &render_options.transformations[1];
+    let transformed_sphere_a = TransformedSurface::new(sphere_a_transform, sphere_a);
 
     // let mut aabb = AxisAlignedBox {min_corner: Point::zero(), max_corner: &Point::zero() + 1.0};
     // let aabb_transform = &lookat_transform * &render_options.transformations[1];
@@ -390,10 +390,10 @@ fn setup_scene(render_options: &RenderOptions) -> Scene {
         objects: vec![
             Box::new(transformed_plane),
             // Box::new(transformed_aabb),
-            // Box::new(transformed_sphere_a),
+            Box::new(transformed_sphere_a),
             // Box::new(transformed_sphere_b),
             // Box::new(transformed_cone),
-            Box::new(transformed_mesh),
+            // Box::new(transformed_mesh),
         ],
         camera: Camera::from_z_position(-1.0, render_options.fov, render_options.projection_type, WIDTH, HEIGHT),
         background_color: Color {r: 0.204, g: 0.596, b: 0.86},

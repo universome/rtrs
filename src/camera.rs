@@ -40,7 +40,7 @@ impl Camera {
         }
     }
 
-    pub fn generate_ray(&self, i: u32, j: u32) -> Ray {
+    pub fn generate_ray(&self, i: f32, j: f32) -> Ray {
         let (u, v) = self.viewing_plane.generate_uv_coords(i, j);
         let d = self.viewing_plane.z - self.origin.z;
 
@@ -75,11 +75,11 @@ impl ViewingPlane {
         }
     }
 
-    pub fn generate_uv_coords(&self, i: u32, j: u32) -> (f32, f32) {
+    pub fn generate_uv_coords(&self, i: f32, j: f32) -> (f32, f32) {
         let x_dist = self.x_max - self.x_min;
         let y_dist = self.y_max - self.y_min;
-        let u = self.x_min + x_dist * (i as f32 + 0.5) / (self.width as f32);
-        let v = self.y_min + y_dist * (j as f32 + 0.5) / (self.height as f32);
+        let u = self.x_min + x_dist * i / (self.width as f32);
+        let v = self.y_min + y_dist * j / (self.height as f32);
 
         (u, v)
     }

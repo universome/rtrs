@@ -6,6 +6,7 @@ extern crate itertools;
 #[macro_use]
 extern crate float_cmp;
 extern crate tobj;
+extern crate rand;
 
 mod scene;
 mod camera;

@@ -1,3 +1,5 @@
+use rand::Rng;
+
 use crate::camera::{Camera};
 use crate::surface::surface::{Surface, Hit};
 use crate::basics::*;
@@ -15,7 +17,7 @@ pub struct Scene {
 
 impl Scene {
     pub fn get_object_idx_at_pixel(&self, i: u32, j: u32) -> Option<usize> {
-        let ray = self.camera.generate_ray(i, j);
+        let ray = self.camera.generate_ray(i as f32, j as f32);
         let mut closest_obj_idx = None;
         let mut min_t = f32::INFINITY;
 
@@ -31,13 +33,11 @@ impl Scene {
         closest_obj_idx
     }
 
-    pub fn compute_pixel(&self, i: u32, j: u32, _debug: bool) -> Color {
-        // let closest_obj = self.get_object_at_pixel(i, j);
-        let ray_world = self.camera.generate_ray(i, j);
+    pub fn compute_ray_color(&self, ray_world: &Ray, _debug: bool) -> Color {
         let mut hit = Hit::inf();
 
         for object in self.objects.iter() {
-            if let Some(another_hit) = object.compute_hit(&ray_world, _debug) {
+            if let Some(another_hit) = object.compute_hit(ray_world, _debug) {
                 if another_hit.t < hit.t {
                     hit = another_hit;
                 }
@@ -84,6 +84,27 @@ impl Scene {
         }
 
         color
+    }
+
+    pub fn compute_pixel(&self, i: u32, j: u32, _debug: bool) -> Color {
+        // let shifts = (0..25).map(|_| rng.gen::<f32>()).collect::<Vec<f32>>();
+        let rays;
+        if false {
+            let mut rng = rand::thread_rng();
+            rays = iproduct!(0..5, 0..5)
+                .map(|p: (i32, i32)| self.camera.generate_ray(
+                    (i as f32) + (p.0 as f32) / 5.0 + rng.gen::<f32>(),
+                    (j as f32) + (p.1 as f32) / 5.0 + rng.gen::<f32>()
+                ))
+                .collect::<Vec<Ray>>();
+        } else {
+            rays = vec![self.camera.generate_ray(i as f32 + 0.5, j as f32 + 0.5)]
+        }
+
+        rays
+            .iter()
+            .map(|ray| &self.compute_ray_color(ray, _debug) * (1.0 / rays.len() as f32))
+            .fold(Color::zero(), |c1, c2| &c1 + &c2)
     }
 }
 
