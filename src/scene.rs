@@ -89,7 +89,7 @@ impl Scene {
 
 
 #[cfg(test)]
-mod tests {
+mod scene_tests {
     use super::*;
     use crate::surface::quadrics::Sphere;
 
@@ -123,7 +123,7 @@ mod tests {
             direction: Vec3 { x: 0.0, y: 1.0 / 2.0_f32.sqrt(), z: 1.0 / 2.0_f32.sqrt() }
             // direction: (&Vec3 { x: 0.0, y: 1.0, z: 1.0 }).normalize()
         };
-        assert_eq!(sphere.compute_hit(&ray_a, false), Some(4.0));
-        assert!(approx_eq!(f32, sphere.compute_hit(&ray_b, false).unwrap(), 1.0));
+        assert_eq!(sphere.compute_hit(&ray_a, false).unwrap().t, 4.0);
+        assert!(approx_eq!(f32, sphere.compute_hit(&ray_b, false).unwrap().t, 1.0, epsilon = 0.001));
     }
 }

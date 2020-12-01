@@ -200,6 +200,20 @@ impl ops::Mul<f32> for &Point {
         }
     }
 }
+
+
+impl ops::Add<f32> for &Point {
+    type Output = Point;
+
+    fn add(self, scalar: f32) -> Point {
+        Point {
+            x: self.x + scalar,
+            y: self.y + scalar,
+            z: self.z + scalar,
+        }
+    }
+}
+
 macro_rules! impl_sub_for_point {
     ($type_lhs:ty, $type_rhs:ty) => {
         impl ops::Sub<$type_rhs> for $type_lhs {

@@ -363,12 +363,15 @@ mod mesh_tests {
         let triangle_a = Triangle {
             indices: (0, 1, 2),
             positions: vertex_positions.clone(),
+            normals: Arc::new(vec![]),
+            calculated_normals: Arc::new(vec![Vec3::zero(), Vec3::zero(), Vec3::zero()]),
         };
         // let triangle_b = Triangle {
         //     indices: (0, 2, 1),
         //     positions: vertex_positions.clone(),
         // };
-        let t_a = triangle_a.compute_hit(&ray, false).unwrap_or(f32::INFINITY);
+        // println!("{:?}", triangle_a.compute_hit(&ray, false));
+        let t_a = triangle_a.compute_hit(&ray, false).unwrap().t;
         // let t_b = triangle_b.compute_hit(&ray, false);
 
         assert!(approx_eq!(f32, t_a, 1.0));
@@ -384,7 +387,7 @@ mod mesh_tests {
             direction: Vec3 {x: 0.0, y: 0.0, z: 1.0},
         };
 
-        let t = mesh.compute_hit(&ray, false).unwrap_or(f32::INFINITY);
+        let t = mesh.compute_hit(&ray, false).unwrap().t;
         assert!(approx_eq!(f32, t, 1.0));
     }
 }

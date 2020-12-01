@@ -32,7 +32,7 @@ impl Sphere {
         }
     }
 
-    fn compute_normal(&self, point: &Point) -> Vec3 {
+    pub fn compute_normal(&self, point: &Point) -> Vec3 {
         &(point - &self.center) * (1. / self.radius)
     }
 }
