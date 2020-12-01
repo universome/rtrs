@@ -101,7 +101,7 @@ impl Scene {
         let NUM_SAMPLES = 5;
         let mut rng = rand::thread_rng();
 
-        if true {
+        if false {
             rays = iproduct!(0..NUM_SAMPLES, 0..NUM_SAMPLES)
                 .map(|p: (i32, i32)| self.camera.generate_ray(
                     (i as f32) + (p.0 as f32) / NUM_SAMPLES as f32 + rng.gen::<f32>(),
@@ -112,18 +112,19 @@ impl Scene {
             rays = vec![self.camera.generate_ray(i as f32 + 0.5, j as f32 + 0.5)]
         }
 
-        let mut light_shifts = if true {
-            iproduct!(0..NUM_SAMPLES, 0..NUM_SAMPLES)
+        let mut light_shifts;
+
+        if false {
+            light_shifts = iproduct!(0..NUM_SAMPLES, 0..NUM_SAMPLES)
                 .map(|p: (i32, i32)| Some((
                     (p.0 as f32) / NUM_SAMPLES as f32 + rng.gen::<f32>(),
                     (p.1 as f32) / NUM_SAMPLES as f32 + rng.gen::<f32>()
                 )))
-                .collect::<Vec<Option<(f32, f32)>>>()
+                .collect::<Vec<Option<(f32, f32)>>>();
+            light_shifts.shuffle(&mut rng);
         } else {
-            vec![None; 25]
+            light_shifts = vec![None; 25];
         };
-
-        light_shifts.shuffle(&mut rng);
 
         rays
             .iter()

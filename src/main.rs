@@ -14,13 +14,14 @@ mod basics;
 mod surface;
 mod matrix;
 mod ray_tracer;
-// mod rasterizer;
+mod rasterizer;
 
 
 fn main() {
-    rayon::ThreadPoolBuilder::new().num_threads(8).build_global().unwrap();
+    // rayon::ThreadPoolBuilder::new().num_threads(8).build_global().unwrap();
     // rayon::ThreadPoolBuilder::new().num_threads(16).build_global().unwrap();
 
     ray_tracer::launch();
+    // rasterizer::launch();
 }
 

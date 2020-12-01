@@ -10,6 +10,7 @@ pub struct Color {
     pub b: f32,
 }
 
+
 impl Color {
     pub fn new(r: f32, g: f32, b: f32) -> Color {
         (&Color {r: r, g: g, b: b}).clamp()
@@ -36,6 +37,7 @@ impl Color {
     }
 }
 
+
 impl ops::Mul<f32> for &Color {
     type Output = Color;
 
@@ -47,6 +49,7 @@ impl ops::Mul<f32> for &Color {
         }).clamp()
     }
 }
+
 
 impl ops::Add<&Color> for &Color {
     type Output = Color;
@@ -74,6 +77,7 @@ pub struct Vec3 {
     pub y: f32,
     pub z: f32,
 }
+
 
 impl Vec3 {
     pub fn new(x: f32, y: f32, z: f32) -> Self {
@@ -128,6 +132,7 @@ macro_rules! impl_index_for_3d_struct {
         }
     }
 }
+
 
 macro_rules! impl_add_vec3 {
     ($type_lhs:ty, $type_rhs:ty) => {

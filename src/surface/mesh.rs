@@ -1,4 +1,6 @@
 use std::sync::Arc;
+use std::fs::File;
+use std::io::BufReader;
 
 use tobj::Model;
 
@@ -88,21 +90,26 @@ impl Surface for Triangle {
             return None;
         }
 
-        let area = face_normal.norm() / 2.0;
         let area_v0 = (v1 - v0).cross_product(&(hit_point - v0)).norm() / 2.0;
         let area_v1 = (v2 - v1).cross_product(&(hit_point - v1)).norm() / 2.0;
         let area_v2 = (v0 - v2).cross_product(&(hit_point - v2)).norm() / 2.0;
+        let area = area_v0 + area_v1 + area_v2;
         let bar_coords = (area_v0 / area, area_v1 / area, area_v2 / area);
 
         let normal = (if self.normals.len() > 0 {
-            &self.normals[self.indices.0] * bar_coords.0 +
-            &self.normals[self.indices.1] * bar_coords.1 +
-            &self.normals[self.indices.2] * bar_coords.2
+            &self.normals[self.indices.0] * bar_coords.1 +
+            &self.normals[self.indices.1] * bar_coords.2 +
+            &self.normals[self.indices.2] * bar_coords.0
+            // &self.normals[self.indices.0] * bar_coords.0 +
+            // &self.normals[self.indices.1] * bar_coords.1 +
+            // &self.normals[self.indices.2] * bar_coords.2
         } else {
-            &self.calculated_normals[self.indices.0] * bar_coords.0 +
-            &self.calculated_normals[self.indices.1] * bar_coords.1 +
-            &self.calculated_normals[self.indices.2] * bar_coords.2
+            &self.calculated_normals[self.indices.0] * bar_coords.1 +
+            &self.calculated_normals[self.indices.1] * bar_coords.2 +
+            &self.calculated_normals[self.indices.2] * bar_coords.0
         }).normalize();
+
+        // println!("Bar coords: {:?}", bar_coords);
 
         Some(Hit {t, normal})
         // Some(Hit {t: t, normal: face_normal.clone()})
@@ -131,56 +138,70 @@ pub struct TriangleMesh {
 impl TriangleMesh {
     pub fn from_obj(obj_file: &str) -> Self {
         let (models, _) = tobj::load_obj(&obj_file, true).unwrap();
+        // let num_triangles_per_model =
+        println!("NUM MODELS: {}", models.len());
+        // let triangles_nums = models.iter().map(|m| m.mesh.num_face_indices.len() as usize).collect::<Vec<usize>>();
         let model = models[0].clone();
-        let num_triangles = model.mesh.num_face_indices.len() as usize;
         let mut positions = vec![];
         let mut normals = vec![];
 
         // We are going to convert a flattened array of [x1, y1, z1, x2, y2, z2, ...]
         // into an array of points [(x1, y1, z1), (x2, y2, z2), ...]
-        for i in 0..(model.mesh.positions.len() / 3) {
-            positions.push(Point::new(
-                model.mesh.positions[i * 3 + 0],
-                model.mesh.positions[i * 3 + 1],
-                model.mesh.positions[i * 3 + 2]
-            ));
+        for model_idx in 0..models.len() {
+            let model = &models[model_idx];
 
-            if model.mesh.normals.len() > 0 {
-                normals.push(Vec3::new(
-                    model.mesh.normals[i * 3 + 0],
-                    model.mesh.normals[i * 3 + 1],
-                    model.mesh.normals[i * 3 + 2]
+            for i in 0..(model.mesh.positions.len() / 3) {
+                positions.push(Point::new(
+                    model.mesh.positions[i * 3 + 0],
+                    model.mesh.positions[i * 3 + 1],
+                    model.mesh.positions[i * 3 + 2]
                 ));
+
+                if model.mesh.normals.len() > 0 {
+                    normals.push(Vec3::new(
+                        model.mesh.normals[i * 3 + 0],
+                        model.mesh.normals[i * 3 + 1],
+                        model.mesh.normals[i * 3 + 2]
+                    ));
+                }
             }
         }
 
         let positions_arc = Arc::new(positions);
         let normals_arc = Arc::new(normals);
         let mut triangles = vec![];
+        let mut index_shift: usize = 0;
 
-        for i in 0..num_triangles {
-            triangles.push(Triangle {
-                indices: (
-                    model.mesh.indices[i * 3 + 0] as usize,
-                    model.mesh.indices[i * 3 + 1] as usize,
-                    model.mesh.indices[i * 3 + 2] as usize
-                ),
-                positions: positions_arc.clone(),
-                calculated_normals: Arc::new(vec![]),
-                normals: normals_arc.clone(),
-            });
+        for model_idx in 0..models.len() {
+            let model = &models[model_idx];
+            let num_triangles = model.mesh.num_face_indices.len() as usize;
+
+            for i in 0..num_triangles {
+                triangles.push(Triangle {
+                    indices: (
+                        index_shift + model.mesh.indices[i * 3 + 0] as usize,
+                        index_shift + model.mesh.indices[i * 3 + 1] as usize,
+                        index_shift + model.mesh.indices[i * 3 + 2] as usize
+                    ),
+                    positions: positions_arc.clone(),
+                    calculated_normals: Arc::new(vec![]),
+                    normals: normals_arc.clone(),
+                });
+            }
+
+            index_shift += model.mesh.positions.len() / 3;
         }
 
         // We are going fill it the following way
         // We iterate over each triangle and each triangle
-        let mut all_normals = vec![vec![]; positions_arc.len()];
+        let mut all_calculated_normals = vec![vec![]; positions_arc.len()];
         for triangle_idx in 0..triangles.len() {
             let normal = triangles[triangle_idx].compute_normal();
-            all_normals[triangles[triangle_idx].indices.0].push(normal.clone());
-            all_normals[triangles[triangle_idx].indices.1].push(normal.clone());
-            all_normals[triangles[triangle_idx].indices.2].push(normal.clone());
+            all_calculated_normals[triangles[triangle_idx].indices.0].push(normal.clone());
+            all_calculated_normals[triangles[triangle_idx].indices.1].push(normal.clone());
+            all_calculated_normals[triangles[triangle_idx].indices.2].push(normal.clone());
         }
-        let calculated_normals = all_normals.iter().map(|normals| {
+        let calculated_normals = all_calculated_normals.iter().map(|normals| {
             normals.iter().fold(Vec3::zero(), |v1, v2| (&v1 + v2)).normalize()
         }).collect::<Vec<Vec3>>();
         let calculated_normals_arc = Arc::new(calculated_normals);
@@ -385,33 +406,36 @@ fn is_on_the_right(hit_point: &Point, from: &Point, to: &Point, normal: &Vec3) -
 mod mesh_tests {
     use super::*;
 
+    fn create_dummy_triangle() -> Triangle {
+        let positions = Arc::new(vec![
+            Point {x: 0.0, y: 0.0, z: 1.0},
+            Point {x: 1.0, y: 0.0, z: 1.0},
+            Point {x: 0.0, y: 1.0, z: 1.0},
+        ]);
+
+        Triangle {
+            indices: (0, 1, 2),
+            positions: positions.clone(),
+            normals: Arc::new(vec![]),
+            calculated_normals: Arc::new(vec![
+                Vec3::new(1.0, 0.0, 0.0),
+                Vec3::new(0.0, 1.0, 0.0),
+                Vec3::new(0.0, 0.0, 1.0)
+            ]),
+        }
+    }
+
     #[test]
     fn test_ray_triangle_intersection() {
         let ray = Ray {
             origin: Point {x: 0.0, y: 0.0, z: 0.0},
             direction: Vec3 {x: 0.0, y: 0.0, z: 1.0},
         };
-        let vertex_positions = Arc::new(vec![
-            Point {x: 0.0, y: 0.0, z: 1.0},
-            Point {x: 1.0, y: 0.0, z: 1.0},
-            Point {x: 0.0, y: 1.0, z: 1.0},
-        ]);
-        let triangle_a = Triangle {
-            indices: (0, 1, 2),
-            positions: vertex_positions.clone(),
-            normals: Arc::new(vec![]),
-            calculated_normals: Arc::new(vec![Vec3::zero(), Vec3::zero(), Vec3::zero()]),
-        };
-        // let triangle_b = Triangle {
-        //     indices: (0, 2, 1),
-        //     positions: vertex_positions.clone(),
-        // };
-        // println!("{:?}", triangle_a.compute_hit(&ray, false));
-        let t_a = triangle_a.compute_hit(&ray, false).unwrap().t;
-        // let t_b = triangle_b.compute_hit(&ray, false);
+        let triangle_a = create_dummy_triangle();
+        let hit = triangle_a.compute_hit(&ray, false).unwrap();
 
-        assert!(approx_eq!(f32, t_a, 1.0));
-        // assert!(t_b.is_none());
+        assert!(approx_eq!(f32, hit.t, 1.0));
+        println!("{:?}", hit);
     }
 
     #[test]
@@ -426,4 +450,14 @@ mod mesh_tests {
         let t = mesh.compute_hit(&ray, false).unwrap().t;
         assert!(approx_eq!(f32, t, 1.0));
     }
+
+    // #[test]
+    // fn test_triangle_normals() {
+    //     let triangle = create_dummy_triangle();
+    //     let ray = Ray {
+    //         origin: Point {x: 0.0, y: 0.0, z: 0.0},
+    //         direction: Vec3 {x: 0.0, y: 0.0, z: 1.0},
+    //     };
+
+    // }
 }
