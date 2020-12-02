@@ -62,7 +62,7 @@ impl State {
     pub fn setup_plane(render_options: &RenderOptions) -> Box<dyn Surface> {
         let lookat_transform = render_options.camera_opts.compute_lookat();
         let plane = Plane::from_y(-1.4, Color {r: 0.5, g: 0.5, b: 0.5});
-        let plane_transform = &lookat_transform * &render_options.transformations[0];
+        let plane_transform = &lookat_transform * &render_options.object_transformations[0];
         let transformed_plane = TransformedSurface::new(plane_transform, plane);
 
         Box::new(transformed_plane)
@@ -76,13 +76,13 @@ impl State {
             reflection_strength: 0.2,
             reflection_glossiness: 0.0,
         };
-        let teapot_transform = &lookat_transform * &render_options.transformations[1];
+        let teapot_transform = &lookat_transform * &render_options.teaset_transformations[0];
         let transformed_teapot = TransformedSurface::new(teapot_transform, self.teapot.clone());
 
-        let teacup_transform = &lookat_transform * &render_options.transformations[2];
+        let teacup_transform = &lookat_transform * &render_options.teaset_transformations[1];
         let transformed_teacup = TransformedSurface::new(teacup_transform, self.teacup.clone());
 
-        let spoon_transform = &lookat_transform * &render_options.transformations[3];
+        let spoon_transform = &lookat_transform * &render_options.teaset_transformations[2];
         let transformed_spoon = TransformedSurface::new(spoon_transform, self.spoon.clone());
 
         vec![
@@ -94,7 +94,7 @@ impl State {
 
     pub fn setup_simple_mesh_scene_objects(&self, render_options: &RenderOptions) -> Vec<Box<dyn Surface>> {
         let lookat_transform = render_options.camera_opts.compute_lookat();
-        let mesh_transform = &lookat_transform * &render_options.transformations[3];
+        let mesh_transform = &lookat_transform * &render_options.simple_teapot_transformation;
         let transformed_mesh = TransformedSurface::new(mesh_transform, self.simple_teapot.clone());
 
         vec![Box::new(transformed_mesh)]
@@ -104,7 +104,7 @@ impl State {
         let lookat_transform = render_options.camera_opts.compute_lookat();
         let mut sphere_a = Sphere::new(VisualData::from_color(&Color {r: 0.0, g: 0.0, b: 1.0}));
         sphere_a.vis.specular_strength = render_options.specular_strengths[1];
-        let sphere_a_transform = &lookat_transform * &render_options.transformations[1];
+        let sphere_a_transform = &lookat_transform * &render_options.object_transformations[1];
         let transformed_sphere_a = TransformedSurface::new(sphere_a_transform, sphere_a);
 
         let sphere_b = Sphere::new(VisualData {
@@ -113,7 +113,7 @@ impl State {
             reflection_strength: 0.5,
             reflection_glossiness: render_options.reflection_glossiness,
         });
-        let sphere_b_transform = &lookat_transform * &render_options.transformations[2];
+        let sphere_b_transform = &lookat_transform * &render_options.object_transformations[2];
         let transformed_sphere_b = TransformedSurface::new(sphere_b_transform, sphere_b);
 
         vec![Box::new(transformed_sphere_a), Box::new(transformed_sphere_b)]
@@ -149,7 +149,9 @@ pub struct RenderOptions {
     pub camera_opts: CameraOptions,
     pub selected_pixel: Option<(u32, u32)>,
     pub selected_object_idx: Option<usize>,
-    pub transformations: [AffineMat3; 5],
+    pub object_transformations: [AffineMat3; 3],
+    pub simple_teapot_transformation: AffineMat3,
+    pub teaset_transformations: [AffineMat3; 3],
     pub specular_strengths: [f32; 5],
     pub spheres_fly_radius: f32,
     pub spheres_fly_speed: f32,
@@ -212,6 +214,13 @@ fn process_key_released_event(app: &App, state: &mut State, key: Key) {
                 MeshNormalType::Provided => MeshNormalType::Precomputed,
                 MeshNormalType::Precomputed => MeshNormalType::Face,
                 MeshNormalType::Face => MeshNormalType::Provided,
+            }
+        },
+        Key::G => {
+            state.opts.ray_opts.mesh_normal_type = match state.opts.ray_opts.mesh_normal_type {
+                MeshNormalType::Precomputed => MeshNormalType::Provided,
+                MeshNormalType::Face => MeshNormalType::Precomputed,
+                MeshNormalType::Provided => MeshNormalType::Face,
             }
         },
         Key::B => {
@@ -486,36 +495,42 @@ impl RenderOptions {
                 pitch: 0.0,
                 position: Vec3 {x: 0.0, y: 0.0, z: -7.0},
             },
-            transformations: [
+            simple_teapot_transformation: AffineMat3 {
+                transform_mat: &Mat3::identity() * 0.1,
+                translation: Vec3::new(0.0, 0.0, 0.0),
+            },
+            teaset_transformations: [
+                AffineMat3 {
+                    transform_mat: &Mat3::rotation(-std::f32::consts::PI * 0.5, &Vec3::new(0.0, 1.0, 0.0)) * &(&Mat3::identity() * 0.5),
+                    translation: Vec3::new(-2.0, -1.4, 0.0),
+                },
+                AffineMat3 {
+                    transform_mat: &Mat3::identity() * 0.5,
+                    translation: Vec3::new(0.0, -1.4, 0.0),
+                },
+                AffineMat3 {
+                    transform_mat: &Mat3::identity() * 2.0,
+                    translation: Vec3::new(2.0, -1.4, 0.0),
+                }
+            ],
+            object_transformations: [
                 AffineMat3::identity(),
                 AffineMat3 {
-                    // transform_mat: &Mat3::identity() * 1.0,
                     transform_mat: &Mat3::identity() * 0.5,
                     translation: Vec3::new(-1.0, 0.0, 0.0),
                 },
                 AffineMat3 {
                     transform_mat: &Mat3::identity() * 0.5,
                     translation: Vec3::new(1.0, 0.0, 0.0),
-                },
-                AffineMat3 {
-                    // transform_mat: &Mat3::rotation(-std::f32::consts::PI * 0.25, &Vec3::new(0.0, 1.0, 0.0)) * &(&Mat3::identity() * 0.5),
-                    // translation: Vec3::new(0.0, -0.5, 0.0),
-                    // transform_mat: &Mat3::rotation(std::f32::consts::PI * 0.3, &Vec3::new(1.0, 0.0, 0.0)) * &(&Mat3::identity() * 0.1),
-                    transform_mat: &Mat3::identity() * 0.1,
-                    translation: Vec3::new(0.0, 0.0, 0.0),
-                },
-                AffineMat3 {
-                    transform_mat: Mat3::identity(),
-                    translation: Vec3::new(0.0, 10.0, 0.0),
                 }
             ],
         }
     }
 
     fn update_transformations_on_time(&mut self, time: f32) {
-        self.transformations[1].translation.x = (time * self.spheres_fly_speed).sin() * self.spheres_fly_radius;
-        self.transformations[1].translation.z = (time * self.spheres_fly_speed).cos() * self.spheres_fly_radius;
-        self.transformations[2].translation.x = -(time * self.spheres_fly_speed).sin() * self.spheres_fly_radius;
-        self.transformations[2].translation.z = -(time * self.spheres_fly_speed).cos() * self.spheres_fly_radius;
+        self.object_transformations[1].translation.x = (time * self.spheres_fly_speed).sin() * self.spheres_fly_radius;
+        self.object_transformations[1].translation.z = (time * self.spheres_fly_speed).cos() * self.spheres_fly_radius;
+        self.object_transformations[2].translation.x = -(time * self.spheres_fly_speed).sin() * self.spheres_fly_radius;
+        self.object_transformations[2].translation.z = -(time * self.spheres_fly_speed).cos() * self.spheres_fly_radius;
     }
 }
