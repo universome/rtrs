@@ -69,7 +69,6 @@ impl Surface for Triangle {
 
         if t_denom.abs() < 0.000001 {
             // The ray and the triangle are parallel
-            // println!("T denom: {:?}", t_denom);
             return None;
         }
 
@@ -78,7 +77,6 @@ impl Surface for Triangle {
 
         if t < MIN_RAY_T {
             // The triangle is either behind or too close
-            // println!("TOO SMALL {:?}", t);
             return None;
         }
 
@@ -87,7 +85,6 @@ impl Surface for Triangle {
         if is_on_the_right(hit_point, v0, v1, face_normal) ||
            is_on_the_right(hit_point, v1, v2, face_normal) ||
            is_on_the_right(hit_point, v2, v0, face_normal) {
-            // println!("Is on the right!");
             return None;
         }
 
@@ -107,15 +104,8 @@ impl Surface for Triangle {
             &self.calculated_normals[self.indices.2] * bar_coords.0
         }).normalize();
 
-        // println!("Bar coords: {:?}", bar_coords);
-
         Some(Hit {t, normal})
-        // Some(Hit {t: t, normal: face_normal.clone()})
     }
-
-    // fn compute_normal(&self, point: &Point) -> Vec3 {
-    //     Vec3 {x: 0.0, y: -1.0, z: 0.0}
-    // }
 
     fn get_visual_data(&self) -> VisualData { self.vis.clone() }
 }
@@ -136,10 +126,6 @@ pub struct TriangleMesh {
 impl TriangleMesh {
     pub fn from_obj(obj_file: &str, vis: VisualData) -> Self {
         let (models, _) = tobj::load_obj(&obj_file, true).unwrap();
-        // let num_triangles_per_model =
-        println!("NUM MODELS: {}", models.len());
-        // let triangles_nums = models.iter().map(|m| m.mesh.num_face_indices.len() as usize).collect::<Vec<usize>>();
-        let model = models[0].clone();
         let mut positions = vec![];
         let mut normals = vec![];
 
@@ -210,7 +196,7 @@ impl TriangleMesh {
         }
 
         TriangleMesh {
-            bvh: Some(BoundingVolumeHierarchy::from_triangles_list(triangles.clone())),
+            bvh: Some(BoundingVolumeHierarchy::from_triangles_list(triangles.clone(), 0)),
             positions: positions_arc,
             calculated_normals: calculated_normals_arc,
             triangles: triangles,
@@ -259,11 +245,12 @@ struct BoundingVolumeHierarchy {
     sphere: Sphere,
     bbox: AxisAlignedBox,
     vis: VisualData,
+    bvh_level: i32,
 }
 
 
 impl BoundingVolumeHierarchy {
-    pub fn from_triangles_list(triangles: Vec<Triangle>) -> Self {
+    pub fn from_triangles_list(triangles: Vec<Triangle>, bvh_level: i32) -> Self {
         assert!(triangles.len() > 0);
 
         if triangles.len() == 1 {
@@ -275,6 +262,7 @@ impl BoundingVolumeHierarchy {
                 bvh_left: None,
                 bvh_right: None,
                 vis: triangles[0].vis.clone(),
+                bvh_level: bvh_level,
             };
         }
 
@@ -287,6 +275,7 @@ impl BoundingVolumeHierarchy {
                 bvh_left: None,
                 bvh_right: None,
                 vis: triangles[0].vis.clone(),
+                bvh_level: bvh_level + 1,
             };
         }
 
@@ -298,10 +287,12 @@ impl BoundingVolumeHierarchy {
 
         let triangle_left = if triangles_left.len() == 1 {Some(triangles_left[0].clone())} else {None};
         let bvh_left = if triangles_left.len() == 1 {None} else {
-            Some(Box::new(BoundingVolumeHierarchy::from_triangles_list(triangles_left.to_vec())))};
+            Some(Box::new(BoundingVolumeHierarchy::from_triangles_list(triangles_left.to_vec(), bvh_level + 1)))
+        };
         let triangle_right = if triangles_right.len() == 1 {Some(triangles_right[0].clone())} else {None};
         let bvh_right = if triangles_right.len() == 1 {None} else {
-            Some(Box::new(BoundingVolumeHierarchy::from_triangles_list(triangles_right.to_vec())))};
+            Some(Box::new(BoundingVolumeHierarchy::from_triangles_list(triangles_right.to_vec(), bvh_level + 1)))
+        };
 
         BoundingVolumeHierarchy  {
             vis: triangles_left[0].vis.clone(),
@@ -311,6 +302,7 @@ impl BoundingVolumeHierarchy {
             bvh_right: bvh_right,
             sphere: sphere,
             bbox: bbox,
+            bvh_level: bvh_level
         }
     }
 
@@ -356,7 +348,12 @@ impl BoundingVolumeHierarchy {
 
 impl Surface for BoundingVolumeHierarchy {
     fn compute_hit(&self, ray: &Ray, debug: bool) -> Option<Hit> {
-        self.bbox.compute_hit(ray, debug)?;
+        let bv_hit = self.bbox.compute_hit(ray, debug)?;
+        // let bv_hit = self.sphere.compute_hit(ray, debug)?;
+
+        if self.bvh_level == 115 {
+            return Some(bv_hit);
+        }
 
         let left_hit = if self.triangle_left.is_some() {
             self.triangle_left.as_ref().unwrap().compute_hit(ray, debug)

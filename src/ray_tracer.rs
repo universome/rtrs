@@ -374,26 +374,25 @@ fn setup_scene(render_options: &RenderOptions) -> Scene {
     // let mesh_surface = TriangleMesh::from_obj("resources/square.obj");
     // let mesh_surface = TriangleMesh::from_obj("resources/cube.obj");
     // println!("Loading mesh...");
-    // let metallic_color = Color {
-    //     r: 0.7686274509803922,
-    //     g: 0.792156862745098,
-    //     b: 0.807843137254902,
-    // }
-    // let mesh_surface = TriangleMesh::from_obj("resources/teapot.obj");
+    let mesh_surface = TriangleMesh::from_obj("resources/teapot.obj", VisualData {
+        color: Color {r: 0.769, g: 0.792, b: 0.808},
+        specular_strength: 0.3,
+        reflection_strength: 0.0,
+        reflection_glossiness: 0.0,
+    });
     // let mesh_surface = TriangleMesh::from_obj("resources/newell_teaset/teapot.obj");
     // let mesh_surface = TriangleMesh::from_obj("resources/newell_teaset/teacup.obj");
-    // let mesh_transform = &lookat_transform * &render_options.transformations[3];
-    // let mesh_transform = &lookat_transform * &render_options.transformations[3];
-    // let transformed_mesh = TransformedSurface::new(mesh_transform, mesh_surface);
+    let mesh_transform = &lookat_transform * &render_options.transformations[3];
+    let transformed_mesh = TransformedSurface::new(mesh_transform, mesh_surface);
 
     Scene {
         objects: vec![
             Box::new(transformed_plane),
             // Box::new(transformed_aabb),
-            Box::new(transformed_sphere_a),
-            Box::new(transformed_sphere_b),
+            // Box::new(transformed_sphere_a),
+            // Box::new(transformed_sphere_b),
             // Box::new(transformed_cone),
-            // Box::new(transformed_mesh),
+            Box::new(transformed_mesh),
         ],
         camera: Camera::from_z_position(-1.0, render_options.fov, render_options.projection_type, WIDTH, HEIGHT),
         background_color: Color {r: 0.204, g: 0.596, b: 0.86},
