@@ -11,6 +11,7 @@ static NUM_DIST_RT_SAMPLES: i32 = 5;
 static NUM_GLOSSY_REFL_RAYS: i32 = 10;
 
 
+#[derive(Debug)]
 pub struct Scene {
     pub objects: Vec<Box<dyn Surface>>,
     pub camera: Camera,

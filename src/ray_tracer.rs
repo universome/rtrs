@@ -6,7 +6,7 @@ use nannou::image::{DynamicImage, RgbImage};
 
 use crate::scene::Scene;
 use crate::camera::{Camera, ProjectionType};
-use crate::surface::surface::{TransformedSurface, VisualData};
+use crate::surface::surface::{TransformedSurface, VisualData, Surface};
 use crate::surface::quadrics::{Sphere, Plane, Cone};
 use crate::surface::aabb::{AxisAlignedBox};
 use crate::surface::mesh::{TriangleMesh};
@@ -21,13 +21,10 @@ static HEIGHT: u32 = 600;
 // static HEIGHT: u32 = 720;
 // static WIDTH: u32 = 1280;
 // static HEIGHT: u32 = 960;
-static mut NUM_FRAMES_SINCE_LAST_SEC: u32 = 0;
-static mut LAST_SEC: u32 = 0;
 
 
 pub struct State {
     opts: RenderOptions,
-    scene: Scene,
     is_mouse_inited: bool,
     curr_mouse_x: f32,
     curr_mouse_y: f32,
@@ -37,6 +34,111 @@ pub struct State {
     scroll_speed: f32,
     rotation_speed: f32,
     scale_speed: f32,
+    selected_scene_idx: u32,
+    simple_teapot: TriangleMesh,
+    teapot: TriangleMesh,
+    teacup: TriangleMesh,
+    spoon: TriangleMesh,
+}
+
+
+impl State {
+    pub fn setup_lights(render_options: &RenderOptions) -> Vec<Light> {
+        // vec![Light {
+        //     location: Point {x: -0.25, y: 10.0, z: -0.25},
+        //     color: Color {r: 1.0, g: 1.0, b: 1.0},
+        //     right: Vec3::new(0.5, 0.0, 0.0),
+        //     top: Vec3::new(0.0, 0.0, 0.5),
+        // }]
+        let lookat_transform = render_options.camera_opts.compute_lookat();
+        vec![Light {
+            location: &lookat_transform * &Point {x: -0.25, y: 10.0, z: -0.25},
+            color: Color {r: 1.0, g: 1.0, b: 1.0},
+            right: &lookat_transform * &Vec3::new(0.5, 0.0, 0.0),
+            top: &lookat_transform * &Vec3::new(0.0, 0.0, 0.5),
+        }]
+    }
+
+    pub fn setup_plane(render_options: &RenderOptions) -> Box<dyn Surface> {
+        let lookat_transform = render_options.camera_opts.compute_lookat();
+        let plane = Plane::from_y(-1.4, Color {r: 0.5, g: 0.5, b: 0.5});
+        let plane_transform = &lookat_transform * &render_options.transformations[0];
+        let transformed_plane = TransformedSurface::new(plane_transform, plane);
+
+        Box::new(transformed_plane)
+    }
+
+    pub fn setup_mesh_scene_objects(&self, render_options: &RenderOptions) -> Vec<Box<dyn Surface>> {
+        let lookat_transform = render_options.camera_opts.compute_lookat();
+        let vis = VisualData {
+            color: Color {r: 0.769, g: 0.792, b: 0.808},
+            specular_strength: 0.3,
+            reflection_strength: 0.2,
+            reflection_glossiness: 0.0,
+        };
+        let teapot_transform = &lookat_transform * &render_options.transformations[1];
+        let transformed_teapot = TransformedSurface::new(teapot_transform, self.teapot.clone());
+
+        let teacup_transform = &lookat_transform * &render_options.transformations[2];
+        let transformed_teacup = TransformedSurface::new(teacup_transform, self.teacup.clone());
+
+        let spoon_transform = &lookat_transform * &render_options.transformations[3];
+        let transformed_spoon = TransformedSurface::new(spoon_transform, self.spoon.clone());
+
+        vec![
+            Box::new(transformed_teapot),
+            Box::new(transformed_teacup),
+            Box::new(transformed_spoon),
+        ]
+    }
+
+    pub fn setup_simple_mesh_scene_objects(&self, render_options: &RenderOptions) -> Vec<Box<dyn Surface>> {
+        let lookat_transform = render_options.camera_opts.compute_lookat();
+        let mesh_transform = &lookat_transform * &render_options.transformations[3];
+        let transformed_mesh = TransformedSurface::new(mesh_transform, self.simple_teapot.clone());
+
+        vec![Box::new(transformed_mesh)]
+    }
+
+    pub fn setup_simple_scene_objects(render_options: &RenderOptions) -> Vec<Box<dyn Surface>> {
+        let lookat_transform = render_options.camera_opts.compute_lookat();
+        let mut sphere_a = Sphere::new(VisualData::from_color(&Color {r: 0.0, g: 0.0, b: 1.0}));
+        sphere_a.vis.specular_strength = render_options.specular_strengths[1];
+        let sphere_a_transform = &lookat_transform * &render_options.transformations[1];
+        let transformed_sphere_a = TransformedSurface::new(sphere_a_transform, sphere_a);
+
+        let sphere_b = Sphere::new(VisualData {
+            color: Color {r: 1.0, g: 0.0, b: 0.0},
+            specular_strength: 0.5,
+            reflection_strength: 0.5,
+            reflection_glossiness: 0.0,
+        });
+        let sphere_b_transform = &lookat_transform * &render_options.transformations[2];
+        let transformed_sphere_b = TransformedSurface::new(sphere_b_transform, sphere_b);
+
+        vec![Box::new(transformed_sphere_a), Box::new(transformed_sphere_b)]
+    }
+
+    pub fn compute_scene(&self) -> Scene {
+        let objects = (match self.selected_scene_idx {
+            0 => State::setup_simple_scene_objects(&self.opts),
+            1 => self.setup_simple_mesh_scene_objects(&self.opts),
+            2 => self.setup_mesh_scene_objects(&self.opts),
+            _ => panic!()
+        });
+        let lights = State::setup_lights(&self.opts);
+        let mut scene_objects = vec![State::setup_plane(&self.opts)];
+        scene_objects.extend(objects);
+
+        Scene {
+            objects: scene_objects,
+            camera: Camera::from_z_position(-1.0, self.opts.fov, self.opts.projection_type, WIDTH, HEIGHT),
+            background_color: Color {r: 0.204, g: 0.596, b: 0.86},
+            lights: lights,
+            ambient_strength: 0.7,
+            diffuse_strength: 0.5,
+        }
+    }
 }
 
 
@@ -52,13 +154,22 @@ pub struct RenderOptions {
     spheres_fly_radius: f32,
     spheres_fly_speed: f32,
     fov: f32,
+    ray_opts: RayOptions,
 }
+
 
 #[derive(Debug, Clone)]
 pub struct CameraOptions {
     pub pitch: f32,
     pub yaw: f32,
     pub position: Vec3,
+}
+
+
+impl CameraOptions {
+    fn compute_lookat(&self) -> AffineMat3 {
+        AffineMat3::create_look_at(&self.position, self.yaw, self.pitch)
+    }
 }
 
 
@@ -81,12 +192,13 @@ fn init_nannou(app: &App) -> State {
 
 
 fn update_on_event(app: &App, state: &mut State, event: Event) {
-    state.opts.update_transformations_on_time(app.time);
-    process_keys(app, state);
-    process_mouse_events(app, state, event);
-    process_mouse_move(app, state);
+    if state.selected_scene_idx == 0 {
+        state.opts.update_transformations_on_time(app.time);
+    }
 
-    state.scene = setup_scene(&state.opts);
+    process_keys(app, state);
+    // process_mouse_events(app, state, event);
+    // process_mouse_move(app, state);
 }
 
 
@@ -184,26 +296,26 @@ fn process_mouse_events(app: &App, state: &mut State, event: Event) {
                     state.opts.selected_pixel = None;
                     state.opts.specular_strengths = [0.0, 0.0, 0.0, 0.0, 1.0];
                 },
-                MousePressed(button) => {
-                    if button != MouseButton::Left {
-                        return;
-                    }
+                // MousePressed(button) => {
+                    // if button != MouseButton::Left {
+                    //     return;
+                    // }
 
-                    let i = (state.curr_mouse_x + (WIDTH as f32) / 2.0) as u32;
-                    let j = (state.curr_mouse_y + (HEIGHT as f32) / 2.0) as u32;
+                    // let i = (state.curr_mouse_x + (WIDTH as f32) / 2.0) as u32;
+                    // let j = (state.curr_mouse_y + (HEIGHT as f32) / 2.0) as u32;
 
                     // state.scene.compute_pixel(i, j, true);
 
-                    if let Some(obj_idx) = state.scene.get_object_idx_at_pixel(i, j) {
-                        state.opts.selected_object_idx = Some(obj_idx);
-                        state.opts.specular_strengths[obj_idx] = 0.7;
-                    } else {
-                        state.opts.selected_object_idx = None;
-                        state.opts.specular_strengths = [0.0, 0.0, 0.0, 0.0, 1.0];
-                    }
+                    // if let Some(obj_idx) = state.scene.get_object_idx_at_pixel(i, j) {
+                    //     state.opts.selected_object_idx = Some(obj_idx);
+                    //     state.opts.specular_strengths[obj_idx] = 0.7;
+                    // } else {
+                    //     state.opts.selected_object_idx = None;
+                    //     state.opts.specular_strengths = [0.0, 0.0, 0.0, 0.0, 1.0];
+                    // }
 
                     // dbg!(&state.opts.camera_opts.position);
-                },
+                // },
                 MouseWheel(scroll_delta, _) => {
                     match scroll_delta {
                         MouseScrollDelta::PixelDelta(position) => {
@@ -261,41 +373,30 @@ fn view(app: &App, state: &State, frame: Frame) {
     let duration = start.elapsed();
     println!("Rending took time: {:?}", duration);
 
-    unsafe {
-        if NUM_FRAMES_SINCE_LAST_SEC == 0 && LAST_SEC % 10 == 0 {
-            img.save("image.tga").unwrap();
-        }
-    }
+    // unsafe {
+    //     if NUM_FRAMES_SINCE_LAST_SEC == 0 && LAST_SEC % 10 == 0 {
+    //         img.save("image.tga").unwrap();
+    //     }
+    // }
 
-    let texture = wgpu::Texture::from_image(app, &img);
-
-    draw.texture(&texture);
-
-    // TODO: there must be some event that we can subscribe on
-    // which would allow us to get rid of mutable statics
-    unsafe {
-        if app.time.floor() as u32 != LAST_SEC {
-            println!("FPS: {}", NUM_FRAMES_SINCE_LAST_SEC + 1);
-
-            LAST_SEC = app.time.floor() as u32;
-            NUM_FRAMES_SINCE_LAST_SEC = 0;
-        } else {
-            NUM_FRAMES_SINCE_LAST_SEC += 1;
-        }
-    }
-
-    // println!("Time: {}", app.time);
-
+    draw.texture(&wgpu::Texture::from_image(app, &img));
     draw.to_frame(app, &frame).unwrap();
 }
 
 
 fn init_state() -> State {
-    println!("Building state!");
+    println!("Building state..");
+
     let render_options = RenderOptions::defaults();
+    let mesh_vis = VisualData {
+        color: Color {r: 0.769, g: 0.792, b: 0.808},
+        specular_strength: 0.3,
+        reflection_strength: 0.0,
+        reflection_glossiness: 0.0,
+    };
 
     State {
-        scene: setup_scene(&render_options),
+        selected_scene_idx: 0,
         opts: render_options,
         is_mouse_inited: false,
         curr_mouse_x: 0.0,
@@ -306,17 +407,22 @@ fn init_state() -> State {
         scroll_speed: 0.01,
         rotation_speed: 0.1,
         scale_speed: 0.05,
+        simple_teapot: TriangleMesh::from_obj("resources/teapot.obj", mesh_vis.clone()),
+        teapot: TriangleMesh::from_obj("resources/newell_teaset/teapot.obj", mesh_vis.clone()),
+        teacup: TriangleMesh::from_obj("resources/newell_teaset/teacup.obj", mesh_vis.clone()),
+        spoon: TriangleMesh::from_obj("resources/newell_teaset/spoon.obj", mesh_vis.clone()),
     }
 }
 
 
 pub fn render_state(state: &State) -> DynamicImage {
     let ray_options = RayOptions::from_depth(0);
+    let scene = state.compute_scene();
     let pixels = iproduct!(0..HEIGHT, 0..WIDTH)
         .collect::<Vec<(u32, u32)>>()
         .par_iter()
         .map(|p: &(u32, u32)| -> Color {
-            state.scene.compute_pixel(p.1, HEIGHT - p.0, ray_options)
+            scene.compute_pixel(p.1, HEIGHT - p.0, ray_options)
         })
         .collect::<Vec<Color>>();
 
@@ -331,82 +437,10 @@ pub fn render_state(state: &State) -> DynamicImage {
 }
 
 
-fn setup_scene(render_options: &RenderOptions) -> Scene {
-    let lookat_transform = AffineMat3::create_look_at(
-        &render_options.camera_opts.position,
-        render_options.camera_opts.yaw,
-        render_options.camera_opts.pitch,
-    );
-
-    let lights = vec![Light {
-        // location: (&lookat_transform * &render_options.transformations[4].translation).into(),
-        location: &lookat_transform * &Point {x: -0.25, y: 10.0, z: -0.25},
-        color: Color {r: 1.0, g: 1.0, b: 1.0},
-        right: &lookat_transform * &Vec3::new(0.5, 0.0, 0.0),
-        top: &lookat_transform * &Vec3::new(0.0, 0.0, 0.5),
-    }];
-
-    let plane = Plane::from_y(-1.4, Color {r: 0.5, g: 0.5, b: 0.5});
-    let plane_transform = &lookat_transform * &render_options.transformations[0];
-    let transformed_plane = TransformedSurface::new(plane_transform, plane);
-
-    let mut sphere_a = Sphere::new(VisualData::from_color(&Color {r: 0.0, g: 0.0, b: 1.0}));
-    sphere_a.vis.specular_strength = render_options.specular_strengths[1];
-    let sphere_a_transform = &lookat_transform * &render_options.transformations[1];
-    let transformed_sphere_a = TransformedSurface::new(sphere_a_transform, sphere_a);
-
-    // let mut aabb = AxisAlignedBox {min_corner: Point::zero(), max_corner: &Point::zero() + 1.0};
-    // let aabb_transform = &lookat_transform * &render_options.transformations[1];
-    // let transformed_aabb = TransformedSurface::new(aabb_transform, aabb);
-
-    let sphere_b = Sphere::new(VisualData {
-        color: Color {r: 1.0, g: 0.0, b: 0.0},
-        specular_strength: 0.5,
-        reflection_strength: 0.5,
-        reflection_glossiness: 0.0,
-    });
-    let sphere_b_transform = &lookat_transform * &render_options.transformations[2];
-    let transformed_sphere_b = TransformedSurface::new(sphere_b_transform, sphere_b);
-
-    // let light_sphere = Sphere::new(lights[0].color.clone());
-    // let light_transform = &lookat_transform * &render_options.transformations[4];
-    // let light_transformed = TransformedSurface::new(light_transform, light_sphere);
-
-    // let mesh_surface = TriangleMesh::from_obj("resources/square.obj");
-    // let mesh_surface = TriangleMesh::from_obj("resources/cube.obj");
-    // println!("Loading mesh...");
-    let mesh_surface = TriangleMesh::from_obj("resources/teapot.obj", VisualData {
-        color: Color {r: 0.769, g: 0.792, b: 0.808},
-        specular_strength: 0.3,
-        reflection_strength: 0.0,
-        reflection_glossiness: 0.0,
-    });
-    // let mesh_surface = TriangleMesh::from_obj("resources/newell_teaset/teapot.obj");
-    // let mesh_surface = TriangleMesh::from_obj("resources/newell_teaset/teacup.obj");
-    let mesh_transform = &lookat_transform * &render_options.transformations[3];
-    let transformed_mesh = TransformedSurface::new(mesh_transform, mesh_surface);
-
-    Scene {
-        objects: vec![
-            Box::new(transformed_plane),
-            // Box::new(transformed_aabb),
-            // Box::new(transformed_sphere_a),
-            // Box::new(transformed_sphere_b),
-            // Box::new(transformed_cone),
-            Box::new(transformed_mesh),
-        ],
-        camera: Camera::from_z_position(-1.0, render_options.fov, render_options.projection_type, WIDTH, HEIGHT),
-        background_color: Color {r: 0.204, g: 0.596, b: 0.86},
-        lights: lights,
-        ambient_strength: 0.7,
-        diffuse_strength: 0.5,
-    }
-}
-
-
 impl RenderOptions {
     fn defaults() -> Self {
         RenderOptions {
+            ray_opts: RayOptions::from_depth(0),
             projection_type: ProjectionType::Perspective,
             number_of_lights: 1,
             selected_pixel: None,
@@ -447,9 +481,9 @@ impl RenderOptions {
     }
 
     fn update_transformations_on_time(&mut self, time: f32) {
-        // self.transformations[1].translation.x = (time * self.spheres_fly_speed).sin() * self.spheres_fly_radius;
-        // self.transformations[1].translation.z = (time * self.spheres_fly_speed).cos() * self.spheres_fly_radius;
-        // self.transformations[2].translation.x = -(time * self.spheres_fly_speed).sin() * self.spheres_fly_radius;
-        // self.transformations[2].translation.z = -(time * self.spheres_fly_speed).cos() * self.spheres_fly_radius;
+        self.transformations[1].translation.x = (time * self.spheres_fly_speed).sin() * self.spheres_fly_radius;
+        self.transformations[1].translation.z = (time * self.spheres_fly_speed).cos() * self.spheres_fly_radius;
+        self.transformations[2].translation.x = -(time * self.spheres_fly_speed).sin() * self.spheres_fly_radius;
+        self.transformations[2].translation.z = -(time * self.spheres_fly_speed).cos() * self.spheres_fly_radius;
     }
 }
