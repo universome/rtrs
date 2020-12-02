@@ -311,11 +311,12 @@ fn init_state() -> State {
 
 
 pub fn render_state(state: &State) -> DynamicImage {
+    let ray_options = RayOptions::from_depth(0);
     let pixels = iproduct!(0..HEIGHT, 0..WIDTH)
         .collect::<Vec<(u32, u32)>>()
         .par_iter()
         .map(|p: &(u32, u32)| -> Color {
-            state.scene.compute_pixel(p.1, HEIGHT - p.0, false)
+            state.scene.compute_pixel(p.1, HEIGHT - p.0, ray_options)
         })
         .collect::<Vec<Color>>();
 

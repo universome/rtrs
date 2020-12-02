@@ -28,7 +28,7 @@ impl Scene {
         let mut min_t = f32::INFINITY;
 
         for (idx, object) in self.objects.iter().enumerate() {
-            if let Some(hit) = object.compute_hit(&ray, false) {
+            if let Some(hit) = object.compute_hit(&ray, RayOptions::from_depth(0)) {
                 if hit.t < min_t {
                     closest_obj_idx = Some(idx);
                     min_t = hit.t;
@@ -39,12 +39,12 @@ impl Scene {
         closest_obj_idx
     }
 
-    pub fn compute_ray_color(&self, ray_camera: &Ray, light_shift: Option<(f32, f32)>, rng: &mut ThreadRng, depth: u32, _debug: bool) -> Color {
+    pub fn compute_ray_color(&self, ray_camera: &Ray, rng: &mut ThreadRng, ray_options: RayOptions) -> Color {
         let mut hit = Hit::inf();
         let mut vis = VisualData::zero();
 
         for object in self.objects.iter() {
-            if let Some(another_hit) = object.compute_hit(ray_camera, _debug) {
+            if let Some(another_hit) = object.compute_hit(ray_camera, ray_options) {
                 if another_hit.t < hit.t {
                     hit = another_hit;
                     vis = object.get_visual_data();
@@ -57,13 +57,11 @@ impl Scene {
         }
 
         let mut color = &vis.color * self.ambient_strength;
-        // let mut color = Color {r: 0.5, g: 0.5, b: 0.5};
         let hit_point_camera = ray_camera.compute_point(hit.t); // TODO: do not recompute the hit point
-        // println!("hit_point_camera: {:?}", hit_point_camera);
 
         for light_camera in self.lights.iter() {
-            let light_location = if light_shift.is_some() {
-                let (shift_right, shift_top) = light_shift.unwrap();
+            let light_location = if ray_options.light_shift.is_some() {
+                let (shift_right, shift_top) = ray_options.light_shift.unwrap();
 
                 &light_camera.location + &(&light_camera.right * shift_right + &light_camera.top * shift_top)
             } else {
@@ -80,7 +78,7 @@ impl Scene {
             // Diffuse component
             let is_in_shadow = self.objects.iter()
                 // .filter(|o| !ptr::eq(*o, &*obj)) TODO: why did we need this?
-                .any(|o| o.compute_hit(&shadow_ray, _debug)
+                .any(|o| o.compute_hit(&shadow_ray, ray_options)
                 .filter(|hit| hit.t < distance_to_light).is_some());
 
             if !is_in_shadow {
@@ -100,7 +98,7 @@ impl Scene {
             }
 
             // Reflection component
-            if depth == 0 && vis.reflection_strength > 0.0 {
+            if ray_options.depth == 0 && vis.reflection_strength > 0.0 {
                 let ray_dir_normalized = ray_camera.direction.normalize();
                 let reflection_dir = &ray_camera.direction + &hit.normal * (-2.0 * ray_dir_normalized.dot_product(&hit.normal));
                 let reflection_rays;
@@ -140,7 +138,7 @@ impl Scene {
                 }
 
                 let reflection_color = reflection_rays.iter().map(
-                    |r| &self.compute_ray_color(r, None, rng, depth + 1, false) * (1.0 / reflection_rays.len() as f32))
+                    |r| &self.compute_ray_color(r, rng, ray_options.increment_depth()) * (1.0 / reflection_rays.len() as f32))
                     .fold(Color::zero(), |c1, c2| &c1 + &c2);
 
                 color = &color + &(&reflection_color * vis.reflection_strength);
@@ -152,7 +150,7 @@ impl Scene {
         color
     }
 
-    pub fn compute_pixel(&self, i: u32, j: u32, _debug: bool) -> Color {
+    pub fn compute_pixel(&self, i: u32, j: u32, ray_options: RayOptions) -> Color {
         // let shifts = (0..25).map(|_| rng.gen::<f32>()).collect::<Vec<f32>>();
         let rays;
         let mut rng = rand::thread_rng();
@@ -185,7 +183,13 @@ impl Scene {
         rays
             .iter()
             .enumerate()
-            .map(|(i, ray)| &self.compute_ray_color(ray, light_shifts[i], &mut rng, 0, _debug) * (1.0 / rays.len() as f32))
+            .map(|(i, ray)| &self.compute_ray_color(ray, &mut rng, RayOptions {
+                    depth: 0,
+                    light_shift: light_shifts[i],
+                    mesh_normal_type: ray_options.mesh_normal_type,
+                    bvh_display_level: ray_options.bvh_display_level,
+                    bv_type: ray_options.bv_type,
+                }) * (1.0 / rays.len() as f32))
             .fold(Color::zero(), |c1, c2| &c1 + &c2)
     }
 }
@@ -226,7 +230,7 @@ mod scene_tests {
             direction: Vec3 { x: 0.0, y: 1.0 / 2.0_f32.sqrt(), z: 1.0 / 2.0_f32.sqrt() }
             // direction: (&Vec3 { x: 0.0, y: 1.0, z: 1.0 }).normalize()
         };
-        assert_eq!(sphere.compute_hit(&ray_a, false).unwrap().t, 4.0);
-        assert!(approx_eq!(f32, sphere.compute_hit(&ray_b, false).unwrap().t, 1.0, epsilon = 0.001));
+        assert_eq!(sphere.compute_hit(&ray_a, RayOptions::from_depth(0)).unwrap().t, 4.0);
+        assert!(approx_eq!(f32, sphere.compute_hit(&ray_b, RayOptions::from_depth(0)).unwrap().t, 1.0, epsilon = 0.001));
     }
 }

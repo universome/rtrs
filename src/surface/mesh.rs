@@ -60,7 +60,7 @@ impl Triangle {
 
 
 impl Surface for Triangle {
-    fn compute_hit(&self, ray: &Ray, debug: bool) -> Option<Hit> {
+    fn compute_hit(&self, ray: &Ray, ray_options: RayOptions) -> Option<Hit> {
         let v0 = &self.positions[self.indices.0];
         let v1 = &self.positions[self.indices.1];
         let v2 = &self.positions[self.indices.2];
@@ -88,21 +88,27 @@ impl Surface for Triangle {
             return None;
         }
 
-        let area_v0 = (v1 - v0).cross_product(&(hit_point - v0)).norm() / 2.0;
-        let area_v1 = (v2 - v1).cross_product(&(hit_point - v1)).norm() / 2.0;
-        let area_v2 = (v0 - v2).cross_product(&(hit_point - v2)).norm() / 2.0;
-        let area = area_v0 + area_v1 + area_v2;
-        let bar_coords = (area_v0 / area, area_v1 / area, area_v2 / area);
+        let normal;
 
-        let normal = (if self.normals.len() > 0 {
-            &self.normals[self.indices.0] * bar_coords.1 +
-            &self.normals[self.indices.1] * bar_coords.2 +
-            &self.normals[self.indices.2] * bar_coords.0
+        if ray_options.mesh_normal_type != MeshNormalType::Face {
+            let area_v0 = (v1 - v0).cross_product(&(hit_point - v0)).norm() / 2.0;
+            let area_v1 = (v2 - v1).cross_product(&(hit_point - v1)).norm() / 2.0;
+            let area_v2 = (v0 - v2).cross_product(&(hit_point - v2)).norm() / 2.0;
+            let area = area_v0 + area_v1 + area_v2;
+            let bar_coords = (area_v0 / area, area_v1 / area, area_v2 / area);
+
+            normal = (if ray_options.mesh_normal_type == MeshNormalType::Provided && self.normals.len() > 0 {
+                &self.normals[self.indices.0] * bar_coords.1 +
+                &self.normals[self.indices.1] * bar_coords.2 +
+                &self.normals[self.indices.2] * bar_coords.0
+            } else {
+                &self.calculated_normals[self.indices.0] * bar_coords.1 +
+                &self.calculated_normals[self.indices.1] * bar_coords.2 +
+                &self.calculated_normals[self.indices.2] * bar_coords.0
+            }).normalize();
         } else {
-            &self.calculated_normals[self.indices.0] * bar_coords.1 +
-            &self.calculated_normals[self.indices.1] * bar_coords.2 +
-            &self.calculated_normals[self.indices.2] * bar_coords.0
-        }).normalize();
+            normal = face_normal.clone();
+        }
 
         Some(Hit {t, normal})
     }
@@ -205,11 +211,11 @@ impl TriangleMesh {
         }
     }
 
-    fn compute_slow_hit(&self, ray: &Ray, debug: bool) -> Option<Hit> {
+    fn compute_slow_hit(&self, ray: &Ray, ray_options: RayOptions) -> Option<Hit> {
         let mut closest_hit = Hit::inf();
 
         for triangle in self.triangles.iter() {
-            if let Some(hit) = triangle.compute_hit(ray, debug) {
+            if let Some(hit) = triangle.compute_hit(ray, ray_options) {
                 closest_hit = if hit.t < closest_hit.t {hit} else {closest_hit};
             }
         }
@@ -225,11 +231,11 @@ impl TriangleMesh {
 
 // impl Surface for TriangleMesh {
 impl Surface for TriangleMesh {
-    fn compute_hit(&self, ray: &Ray, debug: bool) -> Option<Hit> {
-        if self.bvh.is_some() {
-            self.bvh.as_ref().unwrap().compute_hit(ray, debug)
+    fn compute_hit(&self, ray: &Ray, ray_options: RayOptions) -> Option<Hit> {
+        if self.bvh.is_some() && ray_options.bv_type != BVType::None {
+            self.bvh.as_ref().unwrap().compute_hit(ray, ray_options)
         } else {
-            self.compute_slow_hit(ray, debug)
+            self.compute_slow_hit(ray, ray_options)
         }
     }
 
@@ -347,25 +353,28 @@ impl BoundingVolumeHierarchy {
 
 
 impl Surface for BoundingVolumeHierarchy {
-    fn compute_hit(&self, ray: &Ray, debug: bool) -> Option<Hit> {
-        let bv_hit = self.bbox.compute_hit(ray, debug)?;
-        // let bv_hit = self.sphere.compute_hit(ray, debug)?;
+    fn compute_hit(&self, ray: &Ray, ray_options: RayOptions) -> Option<Hit> {
+        let bv_hit = (if ray_options.bv_type == BVType::Sphere {
+            self.sphere.compute_hit(ray, ray_options)
+        } else {
+            self.bbox.compute_hit(ray, ray_options)
+        })?;
 
-        if self.bvh_level == 115 {
+        if self.bvh_level >= ray_options.bvh_display_level {
             return Some(bv_hit);
         }
 
         let left_hit = if self.triangle_left.is_some() {
-            self.triangle_left.as_ref().unwrap().compute_hit(ray, debug)
+            self.triangle_left.as_ref().unwrap().compute_hit(ray, ray_options)
         } else if self.bvh_left.is_some() {
-            (*self.bvh_left.as_ref().unwrap()).compute_hit(ray, debug)
+            (*self.bvh_left.as_ref().unwrap()).compute_hit(ray, ray_options)
         } else {
             None
         };
         let right_hit = if self.triangle_right.is_some() {
-            self.triangle_right.as_ref().unwrap().compute_hit(ray, debug)
+            self.triangle_right.as_ref().unwrap().compute_hit(ray, ray_options)
         } else if self.bvh_right.is_some() {
-            (*self.bvh_right.as_ref().unwrap()).compute_hit(ray, debug)
+            (*self.bvh_right.as_ref().unwrap()).compute_hit(ray, ray_options)
         } else {
             None
         };
@@ -428,7 +437,7 @@ mod mesh_tests {
             direction: Vec3 {x: 0.0, y: 0.0, z: 1.0},
         };
         let triangle_a = create_dummy_triangle();
-        let hit = triangle_a.compute_hit(&ray, false).unwrap();
+        let hit = triangle_a.compute_hit(&ray, RayOptions::from_depth(0)).unwrap();
 
         assert!(approx_eq!(f32, hit.t, 1.0));
         println!("{:?}", hit);
@@ -443,7 +452,7 @@ mod mesh_tests {
             direction: Vec3 {x: 0.0, y: 0.0, z: 1.0},
         };
 
-        let t = mesh.compute_hit(&ray, false).unwrap().t;
+        let t = mesh.compute_hit(&ray, RayOptions::from_depth(0)).unwrap().t;
         assert!(approx_eq!(f32, t, 1.0));
     }
 }

@@ -16,7 +16,7 @@ pub struct AxisAlignedBox {
 }
 
 impl Surface for AxisAlignedBox {
-    fn compute_hit(&self, ray: &Ray, _debug: bool) -> Option<Hit> {
+    fn compute_hit(&self, ray: &Ray, ray_options: RayOptions) -> Option<Hit> {
         let mut t_min = (self.min_corner.x - ray.origin.x) / (ray.direction.x + EPSILON);
         let mut t_max = (self.max_corner.x - ray.origin.x) / (ray.direction.x + EPSILON);
 
@@ -96,8 +96,8 @@ mod box_tests {
             direction: Vec3 {x: 0.0, y: 0.0, z: 1.0},
         };
 
-        println!("Hit: {:?}", aab.compute_hit(&ray, false));
-        let t = aab.compute_hit(&ray, false).unwrap().t;
+        println!("Hit: {:?}", aab.compute_hit(&ray, RayOptions::from_depth(0)));
+        let t = aab.compute_hit(&ray, RayOptions::from_depth(0)).unwrap().t;
         assert!(approx_eq!(f32, t, 1.0));
     }
 }

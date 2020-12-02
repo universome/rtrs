@@ -1,3 +1,4 @@
+use std::cmp::PartialEq;
 use std::ops;
 use nannou::image::{Rgb};
 use derive_more;
@@ -303,31 +304,42 @@ impl Ray {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct DiagMat3 {
-    pub a: f32,
-    pub b: f32,
-    pub c: f32,
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum MeshNormalType {Precomputed, Provided, Face}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum BVType {Sphere, BBox, None}
+
+
+#[derive(Debug, Clone, Copy)]
+pub struct RayOptions {
+    pub bvh_display_level: i32,
+    pub mesh_normal_type: MeshNormalType,
+    pub depth: u32,
+    pub light_shift: Option<(f32, f32)>,
+    pub bv_type: BVType,
 }
 
-impl DiagMat3 {
-    pub fn compute_inverse(&self) -> DiagMat3 {
-        DiagMat3 {
-            a: 1.0 / self.a,
-            b: 1.0 / self.b,
-            c: 1.0 / self.c,
+
+impl RayOptions {
+    pub fn from_depth(depth: u32) -> Self {
+        RayOptions {
+            bvh_display_level: 1000,
+            mesh_normal_type: MeshNormalType::Provided,
+            depth: depth,
+            light_shift: None,
+            bv_type: BVType::BBox,
         }
     }
-}
 
-impl ops::Mul<&Vec3> for &DiagMat3 {
-    type Output = Vec3;
-
-    fn mul(self, vector: &Vec3) -> Vec3 {
-        Vec3 {
-            x: vector.x * self.a,
-            y: vector.y * self.b,
-            z: vector.z * self.c,
+    pub fn increment_depth(&self) -> Self {
+        RayOptions {
+            bvh_display_level: self.bvh_display_level,
+            mesh_normal_type: self.mesh_normal_type,
+            depth: self.depth + 1,
+            light_shift: self.light_shift.clone(),
+            bv_type: BVType::BBox,
         }
     }
 }

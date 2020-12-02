@@ -53,7 +53,7 @@ impl VisualData {
 
 
 pub trait Surface: Debug + Sync {
-    fn compute_hit(&self, ray: &Ray, debug: bool) -> Option<Hit>;
+    fn compute_hit(&self, ray: &Ray, ray_options: RayOptions) -> Option<Hit>;
     fn get_visual_data(&self) -> VisualData;
 }
 
@@ -90,13 +90,13 @@ impl<S: Surface> TransformedSurface<S> {
 
 
 impl<S: Surface> Surface for TransformedSurface<S> {
-    fn compute_hit(&self, ray: &Ray, debug: bool) -> Option<Hit> {
+    fn compute_hit(&self, ray: &Ray, ray_options: RayOptions) -> Option<Hit> {
         let ray_object = Ray {
             origin: &self.transformation_inv * &ray.origin,
             direction: (&self.transformation_inv * &ray.direction).normalize(),
         };
 
-        if let Some(hit) = self.surface.compute_hit(&ray_object, debug) {
+        if let Some(hit) = self.surface.compute_hit(&ray_object, ray_options) {
             let hit_point = &self.transformation * &ray_object.compute_point(hit.t);
             let t_world = ray.compute_t(&hit_point);
 

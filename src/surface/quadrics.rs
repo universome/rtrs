@@ -1,6 +1,6 @@
 use crate::surface::surface::{Surface, Hit, VisualData};
 use crate::basics::*;
-use crate::matrix::{Mat3, AffineMat3};
+use crate::matrix::{Mat3, AffineMat3, DiagMat3};
 use crate::surface::MIN_RAY_T;
 
 
@@ -36,8 +36,7 @@ impl Sphere {
 
 
 impl Surface for Sphere {
-    fn compute_hit(&self, ray: &Ray, debug: bool) -> Option<Hit> {
-        // debug_assert!(is_unit_length(ray.direction));
+    fn compute_hit(&self, ray: &Ray, _ray_options: RayOptions) -> Option<Hit> {
         let orig_to_c = &self.center - &ray.origin;
         let roots = find_square_roots(
             ray.direction.norm_squared(),
@@ -76,7 +75,7 @@ impl Plane {
 
 
 impl Surface for Plane {
-    fn compute_hit(&self, ray: &Ray, debug: bool) -> Option<Hit> {
+    fn compute_hit(&self, ray: &Ray, _ray_options: RayOptions) -> Option<Hit> {
         compute_plane_hit(&self.bias, &self.normal, ray)
     }
 
@@ -104,7 +103,7 @@ impl Ellipsoid {
 
 
 impl Surface for Ellipsoid {
-    fn compute_hit(&self, ray: &Ray, debug: bool) -> Option<Hit> {
+    fn compute_hit(&self, ray: &Ray, _ray_options: RayOptions) -> Option<Hit> {
         let scale_inv = self.scale.compute_inverse();
         let orig_to_c_scaled = &scale_inv * &(&self.center - &ray.origin);
         let ray_dir_scaled = &scale_inv * &ray.direction;
@@ -190,7 +189,7 @@ impl Cone {
 
 
 impl Surface for Cone {
-    fn compute_hit(&self, ray: &Ray, debug: bool) -> Option<Hit> {
+    fn compute_hit(&self, ray: &Ray, _ray_options: RayOptions) -> Option<Hit> {
         let cone_hit = self.compute_cone_hit(ray);
         let slab_hit = self.compute_slab_hit(ray);
 
