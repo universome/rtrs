@@ -339,7 +339,7 @@ fn setup_scene(render_options: &RenderOptions) -> Scene {
 
     let lights = vec![Light {
         // location: (&lookat_transform * &render_options.transformations[4].translation).into(),
-        location: Point { x: -0.25, y: 10.0, z: -0.25},
+        location: &lookat_transform * &Point {x: -0.25, y: 10.0, z: -0.25},
         color: Color {r: 1.0, g: 1.0, b: 1.0},
         right: Vec3::new(0.5, 0.0, 0.0),
         top: Vec3::new(0.0, 0.0, 0.5),
@@ -358,9 +358,9 @@ fn setup_scene(render_options: &RenderOptions) -> Scene {
     // let aabb_transform = &lookat_transform * &render_options.transformations[1];
     // let transformed_aabb = TransformedSurface::new(aabb_transform, aabb);
 
-    // let sphere_b = Sphere::new(Color {r: 1.0, g: 0.0, b: 0.0});
-    // let sphere_b_transform = &lookat_transform * &render_options.transformations[2];
-    // let transformed_sphere_b = TransformedSurface::new(sphere_b_transform, sphere_b);
+    let sphere_b = Sphere::new(Color {r: 1.0, g: 0.0, b: 0.0});
+    let sphere_b_transform = &lookat_transform * &render_options.transformations[2];
+    let transformed_sphere_b = TransformedSurface::new(sphere_b_transform, sphere_b);
 
     // let cone = Cone {
     //     apex: Point {x: 0.0, y: 0.0, z: 0.0},
@@ -384,10 +384,11 @@ fn setup_scene(render_options: &RenderOptions) -> Scene {
     // let mesh_surface = TriangleMesh::from_obj("resources/square.obj");
     // let mesh_surface = TriangleMesh::from_obj("resources/cube.obj");
     println!("Loading mesh...");
-    // let mesh_surface = TriangleMesh::from_obj("resources/teapot.obj");
-    let mesh_surface = TriangleMesh::from_obj("resources/newell_teaset/teapot.obj");
+    let mesh_surface = TriangleMesh::from_obj("resources/teapot.obj");
+    // let mesh_surface = TriangleMesh::from_obj("resources/newell_teaset/teapot.obj");
     // let mesh_surface = TriangleMesh::from_obj("resources/newell_teaset/teacup.obj");
-    let mesh_transform = &lookat_transform * &render_options.transformations[2];
+    // let mesh_transform = &lookat_transform * &render_options.transformations[3];
+    let mesh_transform = &lookat_transform * &render_options.transformations[3];
     let transformed_mesh = TransformedSurface::new(mesh_transform, mesh_surface);
 
     Scene {
@@ -402,8 +403,8 @@ fn setup_scene(render_options: &RenderOptions) -> Scene {
         camera: Camera::from_z_position(-1.0, render_options.fov, render_options.projection_type, WIDTH, HEIGHT),
         background_color: Color {r: 0.204, g: 0.596, b: 0.86},
         lights: lights,
-        ambient_strength: 0.3,
-        diffuse_strength: 0.7,
+        ambient_strength: 0.7,
+        diffuse_strength: 0.5,
     }
 }
 
@@ -429,14 +430,17 @@ impl RenderOptions {
                 AffineMat3 {
                     // transform_mat: &Mat3::identity() * 1.0,
                     transform_mat: &Mat3::identity() * 0.5,
-                    translation: Vec3::new(0.0, -0.5, 0.0),
+                    translation: Vec3::new(-1.0, 0.0, 0.0),
                 },
                 AffineMat3 {
-                    transform_mat: &Mat3::rotation(std::f32::consts::PI * 0.5, &Vec3::new(0.0, 1.0, 0.0)) * &(&Mat3::identity() * 0.5),
+                    transform_mat: &Mat3::identity() * 0.5,
                     translation: Vec3::new(1.0, 0.0, 0.0),
                 },
                 AffineMat3 {
-                    transform_mat: &Mat3::identity() * 1.0,
+                    // transform_mat: &Mat3::rotation(-std::f32::consts::PI * 0.25, &Vec3::new(0.0, 1.0, 0.0)) * &(&Mat3::identity() * 0.5),
+                    // translation: Vec3::new(0.0, -0.5, 0.0),
+                    // transform_mat: &Mat3::rotation(std::f32::consts::PI * 0.3, &Vec3::new(1.0, 0.0, 0.0)) * &(&Mat3::identity() * 0.1),
+                    transform_mat: &Mat3::identity() * 0.1,
                     translation: Vec3::new(0.0, 0.0, 0.0),
                 },
                 AffineMat3 {

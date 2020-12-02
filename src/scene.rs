@@ -49,8 +49,8 @@ impl Scene {
             return self.background_color.clone();
         }
 
-        // let mut color = &obj.get_color() * self.ambient_strength;
-        let mut color = Color {r: 0.5, g: 0.5, b: 0.5};
+        let mut color = &Color {r: 0.5, g: 0.5, b: 0.5} * self.ambient_strength;
+        // let mut color = Color {r: 0.5, g: 0.5, b: 0.5};
         let hit_point_world = ray_world.compute_point(hit.t); // TODO: do not recompute the hit hit_point
         // println!("hit_point_world: {:?}", hit_point_world);
 
@@ -70,26 +70,34 @@ impl Scene {
                 direction: light_dir.clone(),
             };
 
-            if self.objects.iter()
+            let is_in_shadow = self.objects.iter()
                 // .filter(|o| !ptr::eq(*o, &*obj)) TODO: why did we need this?
                 .any(|o| o.compute_hit(&shadow_ray, _debug)
-                        .filter(|hit| hit.t < distance_to_light)
-                        .is_some()) {
-                    // println!("Is in shadow");
-                    continue;
+                .filter(|hit| hit.t < distance_to_light).is_some());
+
+            if !is_in_shadow {
+                let diffuse_cos = hit.normal.dot_product(&light_dir.normalize()).max(0.0);
+                let diffuse_light_color = &light_world.color * (diffuse_cos * self.diffuse_strength);
+                color = &color + &diffuse_light_color;
             }
 
-            let diffuse_cos = hit.normal.dot_product(&light_dir.normalize()).max(0.0);
-            let diffuse_light_color = &light_world.color * (diffuse_cos * self.diffuse_strength);
-
             // Specular light component
-            let eye_dir = (&self.camera.origin - &hit_point_world).normalize();
-            let half_vector = (eye_dir + light_dir).normalize();
+            // let eye_dir = (&self.camera.origin - &hit_point_world).normalize();
+            // let half_vector = (eye_dir + light_dir).normalize();
             // let spec_strength = obj.get_specular_strength() * hit.normal.dot_product(&half_vector).max(0.0).powf(64.0);
-            let spec_strength = 0.0;
-            let spec_color = (&Color {r: 1.0, g: 1.0, b: 1.0}) * spec_strength;
+            // let spec_strength = 0.0;
 
-            color = (&(&color + &diffuse_light_color) + &spec_color).clamp();
+            // Reflection component
+            // let ray_dir_normalized = ray_world.direction.normalize();
+            // let light_reflection_dir = &ray_world.direction + &hit.normal * (-2.0 * ray_dir_normalized.dot_product(&hit.normal));
+            // let reflection_color = self.compute_ray_color(&Ray {
+            //     origin: &hit_point_world + &(&light_reflection_dir.clone() * 0.0001),
+            //     direction: light_reflection_dir
+            // }, None, false);
+
+            // color = (&(&color + &diffuse_light_color) + &spec_color).clamp();
+            // color = &color + &(&reflection_color * 0.5);
+            color = (&color).clamp();
         }
 
         color
