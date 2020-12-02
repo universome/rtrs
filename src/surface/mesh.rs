@@ -4,7 +4,7 @@ use std::io::BufReader;
 
 use tobj::Model;
 
-use crate::surface::surface::{Surface, Hit};
+use crate::surface::surface::{Surface, Hit, VisualData};
 use crate::surface::quadrics::Sphere;
 use crate::surface::aabb::AxisAlignedBox;
 use crate::basics::*;
@@ -23,7 +23,8 @@ pub struct Triangle {
     indices: (usize, usize, usize), // Vertex ids
     positions: Arc<Vec<Point>>,
     calculated_normals: Arc<Vec<Vec3>>,
-    normals: Arc<Vec<Vec3>>
+    normals: Arc<Vec<Vec3>>,
+    vis: VisualData,
 }
 
 
@@ -100,9 +101,6 @@ impl Surface for Triangle {
             &self.normals[self.indices.0] * bar_coords.1 +
             &self.normals[self.indices.1] * bar_coords.2 +
             &self.normals[self.indices.2] * bar_coords.0
-            // &self.normals[self.indices.0] * bar_coords.0 +
-            // &self.normals[self.indices.1] * bar_coords.1 +
-            // &self.normals[self.indices.2] * bar_coords.2
         } else {
             &self.calculated_normals[self.indices.0] * bar_coords.1 +
             &self.calculated_normals[self.indices.1] * bar_coords.2 +
@@ -119,8 +117,7 @@ impl Surface for Triangle {
     //     Vec3 {x: 0.0, y: -1.0, z: 0.0}
     // }
 
-    fn get_color(&self) -> Color { Color {r: 0.3, g: 0.3, b: 0.3} }
-    fn get_specular_strength(&self) -> f32 { 0.5 }
+    fn get_visual_data(&self) -> VisualData { self.vis.clone() }
 }
 
 #[derive(Debug, Clone)]
@@ -131,12 +128,13 @@ pub struct TriangleMesh {
     calculated_normals: Arc<Vec<Vec3>>,
     normals: Arc<Vec<Vec3>>,
     bvh: Option<BoundingVolumeHierarchy>,
+    vis: VisualData,
 }
 
 
 // impl TriangleMesh {
 impl TriangleMesh {
-    pub fn from_obj(obj_file: &str) -> Self {
+    pub fn from_obj(obj_file: &str, vis: VisualData) -> Self {
         let (models, _) = tobj::load_obj(&obj_file, true).unwrap();
         // let num_triangles_per_model =
         println!("NUM MODELS: {}", models.len());
@@ -186,6 +184,7 @@ impl TriangleMesh {
                     positions: positions_arc.clone(),
                     calculated_normals: Arc::new(vec![]),
                     normals: normals_arc.clone(),
+                    vis: vis.clone(),
                 });
             }
 
@@ -216,6 +215,7 @@ impl TriangleMesh {
             calculated_normals: calculated_normals_arc,
             triangles: triangles,
             normals: normals_arc,
+            vis: vis,
         }
     }
 
@@ -247,12 +247,7 @@ impl Surface for TriangleMesh {
         }
     }
 
-    // fn compute_normal(&self, point: &Point) -> Vec3 {
-    //     Vec3 {x: 0.0, y: -1.0, z: 0.0}
-    // }
-
-    fn get_color(&self) -> Color { Color {r: 0.3, g: 0.3, b: 0.3} }
-    fn get_specular_strength(&self) -> f32 { 0.5 }
+    fn get_visual_data(&self) -> VisualData { self.vis.clone() }
 }
 
 #[derive(Debug, Clone)]
@@ -263,6 +258,7 @@ struct BoundingVolumeHierarchy {
     bvh_right: Option<Box<BoundingVolumeHierarchy>>,
     sphere: Sphere,
     bbox: AxisAlignedBox,
+    vis: VisualData,
 }
 
 
@@ -278,6 +274,7 @@ impl BoundingVolumeHierarchy {
                 triangle_right: None,
                 bvh_left: None,
                 bvh_right: None,
+                vis: triangles[0].vis.clone(),
             };
         }
 
@@ -289,6 +286,7 @@ impl BoundingVolumeHierarchy {
                 triangle_right: Some(triangles[1].clone()),
                 bvh_left: None,
                 bvh_right: None,
+                vis: triangles[0].vis.clone(),
             };
         }
 
@@ -306,6 +304,7 @@ impl BoundingVolumeHierarchy {
             Some(Box::new(BoundingVolumeHierarchy::from_triangles_list(triangles_right.to_vec())))};
 
         BoundingVolumeHierarchy  {
+            vis: triangles_left[0].vis.clone(),
             triangle_left: triangle_left,
             triangle_right: triangle_right,
             bvh_left: bvh_left,
@@ -387,8 +386,7 @@ impl Surface for BoundingVolumeHierarchy {
             right_hit
         }
     }
-    fn get_color(&self) -> Color { Color {r: 0.3, g: 0.3, b: 0.3} }
-    fn get_specular_strength(&self) -> f32 { 0.5 }
+    fn get_visual_data(&self) -> VisualData { self.vis.clone() }
 }
 
 
@@ -422,6 +420,7 @@ mod mesh_tests {
                 Vec3::new(0.0, 1.0, 0.0),
                 Vec3::new(0.0, 0.0, 1.0)
             ]),
+            vis: VisualData::grey(),
         }
     }
 
@@ -450,14 +449,4 @@ mod mesh_tests {
         let t = mesh.compute_hit(&ray, false).unwrap().t;
         assert!(approx_eq!(f32, t, 1.0));
     }
-
-    // #[test]
-    // fn test_triangle_normals() {
-    //     let triangle = create_dummy_triangle();
-    //     let ray = Ray {
-    //         origin: Point {x: 0.0, y: 0.0, z: 0.0},
-    //         direction: Vec3 {x: 0.0, y: 0.0, z: 1.0},
-    //     };
-
-    // }
 }

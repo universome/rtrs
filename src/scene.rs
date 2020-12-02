@@ -3,7 +3,7 @@ use rand::seq::SliceRandom;
 use rand::rngs::ThreadRng;
 
 use crate::camera::{Camera};
-use crate::surface::surface::{Surface, Hit};
+use crate::surface::surface::{Surface, Hit, VisualData};
 use crate::basics::*;
 
 
@@ -41,11 +41,13 @@ impl Scene {
 
     pub fn compute_ray_color(&self, ray_camera: &Ray, light_shift: Option<(f32, f32)>, rng: &mut ThreadRng, depth: u32, _debug: bool) -> Color {
         let mut hit = Hit::inf();
+        let mut vis = VisualData::zero();
 
         for object in self.objects.iter() {
             if let Some(another_hit) = object.compute_hit(ray_camera, _debug) {
                 if another_hit.t < hit.t {
                     hit = another_hit;
+                    vis = object.get_visual_data();
                 }
             }
         }
@@ -54,7 +56,7 @@ impl Scene {
             return self.background_color.clone();
         }
 
-        let mut color = &Color {r: 0.5, g: 0.5, b: 0.5} * self.ambient_strength;
+        let mut color = &vis.color * self.ambient_strength;
         // let mut color = Color {r: 0.5, g: 0.5, b: 0.5};
         let hit_point_camera = ray_camera.compute_point(hit.t); // TODO: do not recompute the hit point
         // println!("hit_point_camera: {:?}", hit_point_camera);
@@ -88,20 +90,22 @@ impl Scene {
             }
 
             // Specular light component
-            if false {
-                // let eye_dir = (&self.camera.origin - &hit_point_camera).normalize();
-                // let half_vector = (eye_dir + light_dir).normalize();
-                // let spec_strength = obj.get_specular_strength() * hit.normal.dot_product(&half_vector).max(0.0).powf(64.0);
-                // let spec_strength = 0.0;
+            if vis.specular_strength > 0.0 {
+                let eye_dir = (&self.camera.origin - &hit_point_camera).normalize();
+                let half_vector = (eye_dir + light_dir).normalize();
+                let spec_strength = vis.specular_strength * hit.normal.dot_product(&half_vector).max(0.0).powf(64.0);
+                let spec_color = &light_camera.color * spec_strength;
+
+                color = &color + &spec_color;
             }
 
             // Reflection component
-            if depth == 0 && 0.3 > 0.0 {
+            if depth == 0 && vis.reflection_strength > 0.0 {
                 let ray_dir_normalized = ray_camera.direction.normalize();
                 let reflection_dir = &ray_camera.direction + &hit.normal * (-2.0 * ray_dir_normalized.dot_product(&hit.normal));
                 let reflection_rays;
 
-                if true {
+                if vis.reflection_glossiness > 0.0 {
                     // Selecting the first orthogonal vector is a bit tricky
                     // Since we need to make sure that it is not equal to zero
                     // We just try different options: (0, -z, y), (-z, 0, x), (-y, x, 0)
@@ -120,8 +124,8 @@ impl Scene {
                     // Now, we can generate the rays
                     reflection_rays = (0..NUM_GLOSSY_REFL_RAYS)
                         .map(|_| -> Ray {
-                            let u_weight = 0.1 * (rng.gen::<f32>() - 0.5);
-                            let v_weight = 0.1 * (rng.gen::<f32>() - 0.5);
+                            let u_weight = vis.reflection_glossiness * (rng.gen::<f32>() - 0.5);
+                            let v_weight = vis.reflection_glossiness * (rng.gen::<f32>() - 0.5);
 
                             Ray {
                                 origin: &hit_point_camera + &(&reflection_dir.clone() * 0.0001),
@@ -139,7 +143,7 @@ impl Scene {
                     |r| &self.compute_ray_color(r, None, rng, depth + 1, false) * (1.0 / reflection_rays.len() as f32))
                     .fold(Color::zero(), |c1, c2| &c1 + &c2);
 
-                color = &color + &(&reflection_color * 0.3);
+                color = &color + &(&reflection_color * vis.reflection_strength);
             }
 
             color = (&color).clamp();

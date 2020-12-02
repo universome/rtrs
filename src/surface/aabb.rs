@@ -1,6 +1,6 @@
 use std::mem;
 
-use crate::surface::surface::{Surface, Hit};
+use crate::surface::surface::{Surface, Hit, VisualData};
 use crate::basics::*;
 use crate::matrix::{Mat3, AffineMat3};
 use crate::surface::MIN_RAY_T;
@@ -77,8 +77,7 @@ impl Surface for AxisAlignedBox {
         // Returning the dummy normal since we are not going to render it anyway
         Some(Hit {t: t, normal: Vec3 {x: 0.0, y: 1.0, z: 0.0}})
     }
-    fn get_color(&self) -> Color { Color {r: 0.3, g: 0.3, b: 0.3} }
-    fn get_specular_strength(&self) -> f32 { 0.5 }
+    fn get_visual_data(&self) -> VisualData { VisualData::grey() }
 }
 
 

@@ -1,4 +1,4 @@
-use crate::surface::surface::{Surface, Hit};
+use crate::surface::surface::{Surface, Hit, VisualData};
 use crate::basics::*;
 use crate::matrix::{Mat3, AffineMat3};
 use crate::surface::MIN_RAY_T;
@@ -8,18 +8,16 @@ use crate::surface::MIN_RAY_T;
 pub struct Sphere {
     pub center: Point,
     pub radius: f32,
-    pub color: Color,
-    pub specular_strength: f32,
+    pub vis: VisualData,
 }
 
 
 impl Sphere {
-    pub fn new(color: Color) -> Self {
+    pub fn new(vis: VisualData) -> Self {
         Sphere {
             center: Point {x: 0.0, y: 0.0, z: 0.0},
             radius: 1.0,
-            color: color,
-            specular_strength: 0.0,
+            vis: vis,
         }
     }
 
@@ -27,8 +25,7 @@ impl Sphere {
         Sphere {
             center: center,
             radius: radius,
-            color: Color::zero(),
-            specular_strength: 0.0,
+            vis: VisualData::zero(),
         }
     }
 
@@ -51,14 +48,10 @@ impl Surface for Sphere {
         let hit_point = ray.compute_point(t);
         let normal = self.compute_normal(&hit_point);
 
-        Some(Hit {t: t, normal: normal})
+        Some(Hit::new(t, normal))
     }
 
-    fn get_color(&self) -> Color {
-        self.color.clone()
-    }
-
-    fn get_specular_strength(&self) -> f32 { self.specular_strength }
+    fn get_visual_data(&self) -> VisualData { self.vis.clone() }
 }
 
 
@@ -66,7 +59,7 @@ impl Surface for Sphere {
 pub struct Plane {
     pub bias: Point,
     pub normal: Vec3,
-    pub color: Color,
+    pub vis: VisualData,
 }
 
 
@@ -76,12 +69,8 @@ impl Plane {
         Plane {
             bias: Point {x: 0.0, z: 0.0, y: y},
             normal: Vec3 {x: 0.0, y: 1.0, z: 0.0},
-            color: color
+            vis: VisualData::from_color(&color),
         }
-    }
-
-    fn compute_normal(&self, _point: &Point) -> Vec3 {
-        self.normal.clone()
     }
 }
 
@@ -91,19 +80,14 @@ impl Surface for Plane {
         compute_plane_hit(&self.bias, &self.normal, ray)
     }
 
-    fn get_color(&self) -> Color {
-        self.color.clone()
-    }
-
-    fn get_specular_strength(&self) -> f32 { 0.0 }
+    fn get_visual_data(&self) -> VisualData { self.vis.clone() }
 }
 
 
 #[derive(Debug, Clone)]
 pub struct Ellipsoid {
     pub center: Point,
-    pub color: Color,
-    pub specular_strength: f32,
+    pub vis: VisualData,
     pub scale: DiagMat3,
 }
 
@@ -137,8 +121,7 @@ impl Surface for Ellipsoid {
         Some(Hit {t: t, normal: normal})
     }
 
-    fn get_color(&self) -> Color { self.color.clone() }
-    fn get_specular_strength(&self) -> f32 { self.specular_strength }
+    fn get_visual_data(&self) -> VisualData { self.vis.clone() }
 }
 
 
@@ -147,8 +130,7 @@ pub struct Cone {
     pub apex: Point,
     pub height: f32,
     pub half_angle: f32,
-    pub color: Color,
-    pub specular_strength: f32,
+    pub vis: VisualData,
 }
 
 
@@ -226,8 +208,7 @@ impl Surface for Cone {
         }
     }
 
-    fn get_color(&self) -> Color { self.color.clone() }
-    fn get_specular_strength(&self) -> f32 { self.specular_strength }
+    fn get_visual_data(&self) -> VisualData { self.vis.clone() }
 }
 
 
@@ -292,7 +273,7 @@ fn compute_plane_hit(bias: &Point, normal: &Vec3, ray: &Ray) -> Option<Hit> {
     let t = num / denom;
 
     if t >= MIN_RAY_T {
-        Some(Hit {t: t, normal: normal.clone()})
+        Some(Hit::new(t, normal.clone()))
     } else {
         None
     }

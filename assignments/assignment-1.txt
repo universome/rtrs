@@ -4,7 +4,7 @@ Assignment 1: Simple Ray Tracing - minimal requirements
 
 Implement simple ray tracing algorithm that computes rays for a parallel and perspective projection for a given fixed viewpoint and viewing plane of a resolution at least 640x480. Viewing plane should be defined by equation z = 0 and its extents are [-2,2] in the x direction and [-1.5,1.5] in the y direction with the viewing direction in the positive z direction. The viewpoint should be at the position (0,0,-1).
 
-Define three distinct geometric object types of quadric surfaces, through their analytical formula (spheres, planes, ellipsoids, cones). Two of them should at least partially be defined within the range x:[-2,2], y:[-1.5,1.5], z:R+. First object of these two should be of color (1,0,0) and the second of color (0,1,0). One additional object should be in the same range but with z:R- colored with (0,0,1). A gray (0.5,0.5,0.5) plane should be the last object in the scene and it will be located in y = -1.4.
+Define three distinct geometric object types of quadric surfaces, through their analytical formula (spheres, planes, ellipsoids, cones). Two of them should at least partially be defined within the range x:[-2,2], y:[-1.5,1.5], z:R+. First object of these two should be of color (1,0,0) and the second of color (0,1,0). One additional object should be in the same range but with z:R- colored with (0,0,1). A grey (0.5,0.5,0.5) plane should be the last object in the scene and it will be located in y = -1.4.
 
 Perform a simple intersection test for all pixels iterating over all objects. For each pixel define the closest point of intersection and calculate the surface normal at this location.
 

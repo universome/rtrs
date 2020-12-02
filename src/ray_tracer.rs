@@ -6,7 +6,7 @@ use nannou::image::{DynamicImage, RgbImage};
 
 use crate::scene::Scene;
 use crate::camera::{Camera, ProjectionType};
-use crate::surface::surface::{TransformedSurface};
+use crate::surface::surface::{TransformedSurface, VisualData};
 use crate::surface::quadrics::{Sphere, Plane, Cone};
 use crate::surface::aabb::{AxisAlignedBox};
 use crate::surface::mesh::{TriangleMesh};
@@ -349,8 +349,8 @@ fn setup_scene(render_options: &RenderOptions) -> Scene {
     let plane_transform = &lookat_transform * &render_options.transformations[0];
     let transformed_plane = TransformedSurface::new(plane_transform, plane);
 
-    let mut sphere_a = Sphere::new(Color {r: 0.0, g: 0.0, b: 1.0});
-    sphere_a.specular_strength = render_options.specular_strengths[1];
+    let mut sphere_a = Sphere::new(VisualData::from_color(&Color {r: 0.0, g: 0.0, b: 1.0}));
+    sphere_a.vis.specular_strength = render_options.specular_strengths[1];
     let sphere_a_transform = &lookat_transform * &render_options.transformations[1];
     let transformed_sphere_a = TransformedSurface::new(sphere_a_transform, sphere_a);
 
@@ -358,38 +358,33 @@ fn setup_scene(render_options: &RenderOptions) -> Scene {
     // let aabb_transform = &lookat_transform * &render_options.transformations[1];
     // let transformed_aabb = TransformedSurface::new(aabb_transform, aabb);
 
-    let sphere_b = Sphere::new(Color {r: 1.0, g: 0.0, b: 0.0});
+    let sphere_b = Sphere::new(VisualData {
+        color: Color {r: 1.0, g: 0.0, b: 0.0},
+        specular_strength: 0.5,
+        reflection_strength: 0.5,
+        reflection_glossiness: 0.0,
+    });
     let sphere_b_transform = &lookat_transform * &render_options.transformations[2];
     let transformed_sphere_b = TransformedSurface::new(sphere_b_transform, sphere_b);
-
-    // let cone = Cone {
-    //     apex: Point {x: 0.0, y: 0.0, z: 0.0},
-    //     half_angle: 0.5,
-    //     height: 0.5,
-    //     color: Color {r: 0.0, g: 1.0, b: 0.0},
-    //     specular_strength: render_options.specular_strengths[3],
-    // };
-    // let cone_transform = &lookat_transform * &render_options.transformations[3];
-    // let transformed_cone = TransformedSurface::new(cone_transform, cone);
 
     // let light_sphere = Sphere::new(lights[0].color.clone());
     // let light_transform = &lookat_transform * &render_options.transformations[4];
     // let light_transformed = TransformedSurface::new(light_transform, light_sphere);
 
-    // let obj_file = env::args()
-    //     .skip(1)
-    //     .next()
-    //     .expect("A .obj file to print is required");
-    // let (models, _) = tobj::load_obj(&obj_file, true).unwrap();
     // let mesh_surface = TriangleMesh::from_obj("resources/square.obj");
     // let mesh_surface = TriangleMesh::from_obj("resources/cube.obj");
-    println!("Loading mesh...");
-    let mesh_surface = TriangleMesh::from_obj("resources/teapot.obj");
+    // println!("Loading mesh...");
+    // let metallic_color = Color {
+    //     r: 0.7686274509803922,
+    //     g: 0.792156862745098,
+    //     b: 0.807843137254902,
+    // }
+    // let mesh_surface = TriangleMesh::from_obj("resources/teapot.obj");
     // let mesh_surface = TriangleMesh::from_obj("resources/newell_teaset/teapot.obj");
     // let mesh_surface = TriangleMesh::from_obj("resources/newell_teaset/teacup.obj");
     // let mesh_transform = &lookat_transform * &render_options.transformations[3];
-    let mesh_transform = &lookat_transform * &render_options.transformations[3];
-    let transformed_mesh = TransformedSurface::new(mesh_transform, mesh_surface);
+    // let mesh_transform = &lookat_transform * &render_options.transformations[3];
+    // let transformed_mesh = TransformedSurface::new(mesh_transform, mesh_surface);
 
     Scene {
         objects: vec![

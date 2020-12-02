@@ -9,37 +9,52 @@ use crate::matrix::{Mat3, AffineMat3};
 #[derive(Debug, Clone)]
 pub struct Hit {
     pub t: f32,
-    pub normal: Vec3
+    pub normal: Vec3,
 }
 
 
 impl Hit {
-    pub fn inf() -> Hit {
-        Hit {
-            t: f32::INFINITY,
-            normal: Vec3 {x: 0.0, y: 1.0, z: 0.0}
+    pub fn new(t: f32, normal: Vec3) -> Self {
+        Hit {t, normal}
+    }
+
+    pub fn inf() -> Self {
+        Hit::new(f32::INFINITY, Vec3 {x: 0.0, y: 1.0, z: 0.0})
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct VisualData {
+    pub color: Color,
+    pub specular_strength: f32,
+    pub reflection_strength: f32,
+    pub reflection_glossiness: f32,
+}
+
+
+impl VisualData {
+    pub fn from_color(color: &Color) -> Self {
+        VisualData {
+            color: color.clone(),
+            specular_strength: 0.0,
+            reflection_strength: 0.0,
+            reflection_glossiness: 0.0,
         }
+    }
+
+    pub fn zero() -> Self {
+        VisualData::from_color(&Color::zero())
+    }
+
+    pub fn grey() -> Self {
+        VisualData::from_color(&Color {r: 0.74, g: 0.76, b: 0.78})
     }
 }
 
 
-// macro_rules! impl_cmp_for_hit {
-//     ($type_lhs:ty, $type_rhs:ty) => {
-//         impl Ord for $type_lhs {
-//             fn eq(&self, other: $type_rhs) -> Ordering {
-//                 self.t.cmp(other.t)
-//             }
-//         }
-//     };
-// }
-// impl_cmp_for_hit!(Hit, Hit);
-
-
 pub trait Surface: Debug + Sync {
     fn compute_hit(&self, ray: &Ray, debug: bool) -> Option<Hit>;
-    // fn compute_normal(&self, point: &Point) -> Vec3;
-    fn get_color(&self) -> Color;
-    fn get_specular_strength(&self) -> f32;
+    fn get_visual_data(&self) -> VisualData;
 }
 
 
@@ -84,17 +99,12 @@ impl<S: Surface> Surface for TransformedSurface<S> {
         if let Some(hit) = self.surface.compute_hit(&ray_object, debug) {
             let hit_point = &self.transformation * &ray_object.compute_point(hit.t);
             let t_world = ray.compute_t(&hit_point);
-            // let normal = self.compute_normal(hit_point);
 
-            return Some(Hit {
-                t: t_world,
-                normal: self.transform_normal(&hit.normal)
-            });
+            return Some(Hit::new(t_world, self.transform_normal(&hit.normal)));
         }
 
         None
     }
 
-    fn get_color(&self) -> Color { self.surface.get_color() }
-    fn get_specular_strength(&self) -> f32 { self.surface.get_specular_strength() }
+    fn get_visual_data(&self) -> VisualData { self.surface.get_visual_data() }
 }
