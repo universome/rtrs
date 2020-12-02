@@ -157,7 +157,7 @@ impl Scene {
         let rays;
         let mut rng = rand::thread_rng();
 
-        if render_options.use_supersampling {
+        if render_options.use_supersampling || render_options.use_soft_shadows {
             rays = iproduct!(0..NUM_DIST_RT_SAMPLES, 0..NUM_DIST_RT_SAMPLES)
                 .map(|p: (i32, i32)| self.camera.generate_ray(
                     (i as f32) + (p.0 as f32) / NUM_DIST_RT_SAMPLES as f32 + rng.gen::<f32>(),

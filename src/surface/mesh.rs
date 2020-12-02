@@ -124,7 +124,7 @@ pub struct TriangleMesh {
     calculated_normals: Arc<Vec<Vec3>>,
     normals: Arc<Vec<Vec3>>,
     bvh: Option<BoundingVolumeHierarchy>,
-    vis: VisualData,
+    pub vis: VisualData,
 }
 
 

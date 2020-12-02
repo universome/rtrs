@@ -4,10 +4,14 @@ My homework assignments for CS248 Computer Graphics course at KAUST 2020 Fall.
 ### Reports
 - [Assignment 1](reports/assignment-1.md)
 - [Assignment 2](reports/assignment-2.md)
+- [Assignment 3](reports/assignment-3.md)
+- [Assignment 4](reports/assignment-4.md)
 
 ### Assignment descriptions
 - [Assignment 1](assignments/assignment-1.txt)
 - [Assignment 2](assignments/assignment-2.txt)
+- [Assignment 3](assignments/assignment-3.txt)
+- [Assignment 4](assignments/assignment-4.txt)
 
 ### Technologies used
 In the assignment, were used the following libraries:

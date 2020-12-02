@@ -15,12 +15,12 @@ use crate::matrix::{Mat3, AffineMat3};
 
 // static WIDTH: u32 = 640;
 // static HEIGHT: u32 = 480;
-static WIDTH: u32 = 800;
-static HEIGHT: u32 = 600;
+// static WIDTH: u32 = 800;
+// static HEIGHT: u32 = 600;
 // static WIDTH: u32 = 960;
 // static HEIGHT: u32 = 720;
-// static WIDTH: u32 = 1280;
-// static HEIGHT: u32 = 960;
+static WIDTH: u32 = 1280;
+static HEIGHT: u32 = 960;
 
 
 pub struct State {
@@ -70,20 +70,22 @@ impl State {
 
     pub fn setup_mesh_scene_objects(&self, render_options: &RenderOptions) -> Vec<Box<dyn Surface>> {
         let lookat_transform = render_options.camera_opts.compute_lookat();
-        let vis = VisualData {
-            color: Color {r: 0.769, g: 0.792, b: 0.808},
-            specular_strength: 0.3,
-            reflection_strength: 0.2,
-            reflection_glossiness: 0.0,
-        };
+        let mut teapot = self.teapot.clone();
+        let mut teacup = self.teacup.clone();
+        let mut spoon = self.spoon.clone();
+
+        teapot.vis.reflection_glossiness = render_options.reflection_glossiness;
+        teacup.vis.reflection_glossiness = render_options.reflection_glossiness;
+        spoon.vis.reflection_glossiness = render_options.reflection_glossiness;
+
         let teapot_transform = &lookat_transform * &render_options.teaset_transformations[0];
-        let transformed_teapot = TransformedSurface::new(teapot_transform, self.teapot.clone());
+        let transformed_teapot = TransformedSurface::new(teapot_transform, teapot);
 
         let teacup_transform = &lookat_transform * &render_options.teaset_transformations[1];
-        let transformed_teacup = TransformedSurface::new(teacup_transform, self.teacup.clone());
+        let transformed_teacup = TransformedSurface::new(teacup_transform, teacup);
 
         let spoon_transform = &lookat_transform * &render_options.teaset_transformations[2];
-        let transformed_spoon = TransformedSurface::new(spoon_transform, self.spoon.clone());
+        let transformed_spoon = TransformedSurface::new(spoon_transform, spoon);
 
         vec![
             Box::new(transformed_teapot),
@@ -94,8 +96,10 @@ impl State {
 
     pub fn setup_simple_mesh_scene_objects(&self, render_options: &RenderOptions) -> Vec<Box<dyn Surface>> {
         let lookat_transform = render_options.camera_opts.compute_lookat();
+        let mut simple_teapot = self.simple_teapot.clone();
+        simple_teapot.vis.reflection_glossiness = render_options.reflection_glossiness;
         let mesh_transform = &lookat_transform * &render_options.simple_teapot_transformation;
-        let transformed_mesh = TransformedSurface::new(mesh_transform, self.simple_teapot.clone());
+        let transformed_mesh = TransformedSurface::new(mesh_transform, simple_teapot);
 
         vec![Box::new(transformed_mesh)]
     }
@@ -214,30 +218,48 @@ fn process_key_released_event(app: &App, state: &mut State, key: Key) {
                 MeshNormalType::Provided => MeshNormalType::Precomputed,
                 MeshNormalType::Precomputed => MeshNormalType::Face,
                 MeshNormalType::Face => MeshNormalType::Provided,
-            }
+            };
+            println!("Set bvh_display_level to {:?}", state.opts.ray_opts.mesh_normal_type);
         },
         Key::G => {
             state.opts.ray_opts.mesh_normal_type = match state.opts.ray_opts.mesh_normal_type {
                 MeshNormalType::Precomputed => MeshNormalType::Provided,
                 MeshNormalType::Face => MeshNormalType::Precomputed,
                 MeshNormalType::Provided => MeshNormalType::Face,
-            }
+            };
+            println!("Set bvh_display_level to {:?}", state.opts.ray_opts.mesh_normal_type);
         },
         Key::B => {
             state.opts.ray_opts.bv_type = match state.opts.ray_opts.bv_type {
                 BVType::BBox => BVType::Sphere,
                 BVType::Sphere => BVType::None,
                 BVType::None => BVType::BBox,
-            }
+            };
+            println!("Set bv_type to {:?}", state.opts.ray_opts.bv_type);
         },
         Key::Key1 => state.selected_scene_idx = 0,
         Key::Key2 => state.selected_scene_idx = 1,
         Key::Key3 => state.selected_scene_idx = 2,
-        Key::Up => state.opts.ray_opts.bvh_display_level += 1,
-        Key::Down => state.opts.ray_opts.bvh_display_level -= 1,
-        Key::I => state.opts.use_supersampling = !state.opts.use_supersampling,
-        Key::O => state.opts.use_soft_shadows = !state.opts.use_soft_shadows,
-        Key::P => state.opts.reflection_glossiness = if state.opts.reflection_glossiness == 0.0 {0.2} else {0.0},
+        Key::Up => {
+            state.opts.ray_opts.bvh_display_level += 1;
+            println!("Set bvh_display_level to {}", state.opts.ray_opts.bvh_display_level);
+        },
+        Key::Down => {
+            state.opts.ray_opts.bvh_display_level -= 1;
+            println!("Set bvh_display_level to {}", state.opts.ray_opts.bvh_display_level);
+        },
+        Key::I => {
+            state.opts.use_supersampling = !state.opts.use_supersampling;
+            println!("Set use_supersampling to {}", state.opts.use_supersampling);
+        },
+        Key::O => {
+            state.opts.use_soft_shadows = !state.opts.use_soft_shadows;
+            println!("Set use_soft_shadows to {}", state.opts.use_soft_shadows);
+        },
+        Key::P => {
+            state.opts.reflection_glossiness = if state.opts.reflection_glossiness == 0.0 {0.2} else {0.0};
+            println!("Set reflection_glossiness to {}", state.opts.reflection_glossiness);
+        },
         Key::Q => *state = init_state(),
         _ => {},
     }
@@ -412,11 +434,7 @@ fn view(app: &App, state: &State, frame: Frame) {
     let duration = start.elapsed();
     println!("Rending took time: {:?}", duration);
 
-    // unsafe {
-    //     if NUM_FRAMES_SINCE_LAST_SEC == 0 && LAST_SEC % 10 == 0 {
-    //         img.save("image.tga").unwrap();
-    //     }
-    // }
+    img.save("image.png").unwrap();
 
     draw.texture(&wgpu::Texture::from_image(app, &img));
     draw.to_frame(app, &frame).unwrap();
@@ -429,8 +447,8 @@ fn init_state() -> State {
     let render_options = RenderOptions::defaults();
     let mesh_vis = VisualData {
         color: Color {r: 0.769, g: 0.792, b: 0.808},
-        specular_strength: 0.3,
-        reflection_strength: 0.0,
+        specular_strength: 0.2,
+        reflection_strength: 0.2,
         reflection_glossiness: 0.0,
     };
 
@@ -502,15 +520,15 @@ impl RenderOptions {
             teaset_transformations: [
                 AffineMat3 {
                     transform_mat: &Mat3::rotation(-std::f32::consts::PI * 0.5, &Vec3::new(0.0, 1.0, 0.0)) * &(&Mat3::identity() * 0.5),
-                    translation: Vec3::new(-2.0, -1.4, 0.0),
+                    translation: Vec3::new(-1.5, -1.4, 0.0),
                 },
                 AffineMat3 {
                     transform_mat: &Mat3::identity() * 0.5,
-                    translation: Vec3::new(0.0, -1.4, 0.0),
+                    translation: Vec3::new(0.5, -1.4, 0.0),
                 },
                 AffineMat3 {
                     transform_mat: &Mat3::identity() * 2.0,
-                    translation: Vec3::new(2.0, -1.4, 0.0),
+                    translation: Vec3::new(2.5, -1.4, 0.0),
                 }
             ],
             object_transformations: [
