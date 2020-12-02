@@ -1,9 +1,14 @@
 use rand::Rng;
 use rand::seq::SliceRandom;
+use rand::rngs::ThreadRng;
 
 use crate::camera::{Camera};
 use crate::surface::surface::{Surface, Hit};
 use crate::basics::*;
+
+
+static NUM_DIST_RT_SAMPLES: i32 = 5;
+static NUM_GLOSSY_REFL_RAYS: i32 = 10;
 
 
 pub struct Scene {
@@ -34,11 +39,11 @@ impl Scene {
         closest_obj_idx
     }
 
-    pub fn compute_ray_color(&self, ray_world: &Ray, light_shift: Option<(f32, f32)>, _debug: bool) -> Color {
+    pub fn compute_ray_color(&self, ray_camera: &Ray, light_shift: Option<(f32, f32)>, rng: &mut ThreadRng, depth: u32, _debug: bool) -> Color {
         let mut hit = Hit::inf();
 
         for object in self.objects.iter() {
-            if let Some(another_hit) = object.compute_hit(ray_world, _debug) {
+            if let Some(another_hit) = object.compute_hit(ray_camera, _debug) {
                 if another_hit.t < hit.t {
                     hit = another_hit;
                 }
@@ -51,25 +56,26 @@ impl Scene {
 
         let mut color = &Color {r: 0.5, g: 0.5, b: 0.5} * self.ambient_strength;
         // let mut color = Color {r: 0.5, g: 0.5, b: 0.5};
-        let hit_point_world = ray_world.compute_point(hit.t); // TODO: do not recompute the hit hit_point
-        // println!("hit_point_world: {:?}", hit_point_world);
+        let hit_point_camera = ray_camera.compute_point(hit.t); // TODO: do not recompute the hit point
+        // println!("hit_point_camera: {:?}", hit_point_camera);
 
-        for light_world in self.lights.iter() {
+        for light_camera in self.lights.iter() {
             let light_location = if light_shift.is_some() {
                 let (shift_right, shift_top) = light_shift.unwrap();
 
-                &light_world.location + &(&light_world.right * shift_right + &light_world.top * shift_top)
+                &light_camera.location + &(&light_camera.right * shift_right + &light_camera.top * shift_top)
             } else {
-                light_world.location.clone()
+                light_camera.location.clone()
             };
 
-            let distance_to_light = (&light_location - &hit_point_world).norm();
-            let light_dir = (&light_location - &hit_point_world).normalize();
+            let distance_to_light = (&light_location - &hit_point_camera).norm();
+            let light_dir = (&light_location - &hit_point_camera).normalize();
             let shadow_ray = Ray {
-                origin: &hit_point_world + &(&light_dir.clone() * 0.0001),
+                origin: &hit_point_camera + &(&light_dir.clone() * 0.0001),
                 direction: light_dir.clone(),
             };
 
+            // Diffuse component
             let is_in_shadow = self.objects.iter()
                 // .filter(|o| !ptr::eq(*o, &*obj)) TODO: why did we need this?
                 .any(|o| o.compute_hit(&shadow_ray, _debug)
@@ -77,26 +83,65 @@ impl Scene {
 
             if !is_in_shadow {
                 let diffuse_cos = hit.normal.dot_product(&light_dir.normalize()).max(0.0);
-                let diffuse_light_color = &light_world.color * (diffuse_cos * self.diffuse_strength);
+                let diffuse_light_color = &light_camera.color * (diffuse_cos * self.diffuse_strength);
                 color = &color + &diffuse_light_color;
             }
 
             // Specular light component
-            // let eye_dir = (&self.camera.origin - &hit_point_world).normalize();
-            // let half_vector = (eye_dir + light_dir).normalize();
-            // let spec_strength = obj.get_specular_strength() * hit.normal.dot_product(&half_vector).max(0.0).powf(64.0);
-            // let spec_strength = 0.0;
+            if false {
+                // let eye_dir = (&self.camera.origin - &hit_point_camera).normalize();
+                // let half_vector = (eye_dir + light_dir).normalize();
+                // let spec_strength = obj.get_specular_strength() * hit.normal.dot_product(&half_vector).max(0.0).powf(64.0);
+                // let spec_strength = 0.0;
+            }
 
             // Reflection component
-            // let ray_dir_normalized = ray_world.direction.normalize();
-            // let light_reflection_dir = &ray_world.direction + &hit.normal * (-2.0 * ray_dir_normalized.dot_product(&hit.normal));
-            // let reflection_color = self.compute_ray_color(&Ray {
-            //     origin: &hit_point_world + &(&light_reflection_dir.clone() * 0.0001),
-            //     direction: light_reflection_dir
-            // }, None, false);
+            if depth == 0 && 0.3 > 0.0 {
+                let ray_dir_normalized = ray_camera.direction.normalize();
+                let reflection_dir = &ray_camera.direction + &hit.normal * (-2.0 * ray_dir_normalized.dot_product(&hit.normal));
+                let reflection_rays;
 
-            // color = (&(&color + &diffuse_light_color) + &spec_color).clamp();
-            // color = &color + &(&reflection_color * 0.5);
+                if true {
+                    // Selecting the first orthogonal vector is a bit tricky
+                    // Since we need to make sure that it is not equal to zero
+                    // We just try different options: (0, -z, y), (-z, 0, x), (-y, x, 0)
+                    let mut u = Vec3::new(0.0, -reflection_dir.z, reflection_dir.y);
+                    if u.norm_squared() == 0.0 {
+                        u = Vec3::new(-reflection_dir.z, 0.0, reflection_dir.x);
+                    }
+                    if u.norm_squared() == 0.0 {
+                        u = Vec3::new(-reflection_dir.y, reflection_dir.x, 0.0);
+                    }
+                    u = u.normalize();
+
+                    // Selecting the second orthogonal vector is trivial
+                    let v = reflection_dir.cross_product(&u).normalize();
+
+                    // Now, we can generate the rays
+                    reflection_rays = (0..NUM_GLOSSY_REFL_RAYS)
+                        .map(|_| -> Ray {
+                            let u_weight = 0.1 * (rng.gen::<f32>() - 0.5);
+                            let v_weight = 0.1 * (rng.gen::<f32>() - 0.5);
+
+                            Ray {
+                                origin: &hit_point_camera + &(&reflection_dir.clone() * 0.0001),
+                                direction: &reflection_dir + &u * u_weight + &v * v_weight,
+                            }
+                        }).collect::<Vec<Ray>>();
+                } else {
+                    reflection_rays = vec![Ray {
+                        origin: &hit_point_camera + &(&reflection_dir.clone() * 0.0001),
+                        direction: reflection_dir
+                    }];
+                }
+
+                let reflection_color = reflection_rays.iter().map(
+                    |r| &self.compute_ray_color(r, None, rng, depth + 1, false) * (1.0 / reflection_rays.len() as f32))
+                    .fold(Color::zero(), |c1, c2| &c1 + &c2);
+
+                color = &color + &(&reflection_color * 0.3);
+            }
+
             color = (&color).clamp();
         }
 
@@ -106,14 +151,13 @@ impl Scene {
     pub fn compute_pixel(&self, i: u32, j: u32, _debug: bool) -> Color {
         // let shifts = (0..25).map(|_| rng.gen::<f32>()).collect::<Vec<f32>>();
         let rays;
-        let NUM_SAMPLES = 5;
         let mut rng = rand::thread_rng();
 
         if false {
-            rays = iproduct!(0..NUM_SAMPLES, 0..NUM_SAMPLES)
+            rays = iproduct!(0..NUM_DIST_RT_SAMPLES, 0..NUM_DIST_RT_SAMPLES)
                 .map(|p: (i32, i32)| self.camera.generate_ray(
-                    (i as f32) + (p.0 as f32) / NUM_SAMPLES as f32 + rng.gen::<f32>(),
-                    (j as f32) + (p.1 as f32) / NUM_SAMPLES as f32 + rng.gen::<f32>()
+                    (i as f32) + (p.0 as f32) / NUM_DIST_RT_SAMPLES as f32 + rng.gen::<f32>(),
+                    (j as f32) + (p.1 as f32) / NUM_DIST_RT_SAMPLES as f32 + rng.gen::<f32>()
                 ))
                 .collect::<Vec<Ray>>();
         } else {
@@ -123,10 +167,10 @@ impl Scene {
         let mut light_shifts;
 
         if false {
-            light_shifts = iproduct!(0..NUM_SAMPLES, 0..NUM_SAMPLES)
+            light_shifts = iproduct!(0..NUM_DIST_RT_SAMPLES, 0..NUM_DIST_RT_SAMPLES)
                 .map(|p: (i32, i32)| Some((
-                    (p.0 as f32) / NUM_SAMPLES as f32 + rng.gen::<f32>(),
-                    (p.1 as f32) / NUM_SAMPLES as f32 + rng.gen::<f32>()
+                    (p.0 as f32) / NUM_DIST_RT_SAMPLES as f32 + rng.gen::<f32>(),
+                    (p.1 as f32) / NUM_DIST_RT_SAMPLES as f32 + rng.gen::<f32>()
                 )))
                 .collect::<Vec<Option<(f32, f32)>>>();
             light_shifts.shuffle(&mut rng);
@@ -137,7 +181,7 @@ impl Scene {
         rays
             .iter()
             .enumerate()
-            .map(|(i, ray)| &self.compute_ray_color(ray, light_shifts[i], _debug) * (1.0 / rays.len() as f32))
+            .map(|(i, ray)| &self.compute_ray_color(ray, light_shifts[i], &mut rng, 0, _debug) * (1.0 / rays.len() as f32))
             .fold(Color::zero(), |c1, c2| &c1 + &c2)
     }
 }

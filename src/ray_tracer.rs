@@ -341,8 +341,8 @@ fn setup_scene(render_options: &RenderOptions) -> Scene {
         // location: (&lookat_transform * &render_options.transformations[4].translation).into(),
         location: &lookat_transform * &Point {x: -0.25, y: 10.0, z: -0.25},
         color: Color {r: 1.0, g: 1.0, b: 1.0},
-        right: Vec3::new(0.5, 0.0, 0.0),
-        top: Vec3::new(0.0, 0.0, 0.5),
+        right: &lookat_transform * &Vec3::new(0.5, 0.0, 0.0),
+        top: &lookat_transform * &Vec3::new(0.0, 0.0, 0.5),
     }];
 
     let plane = Plane::from_y(-1.4, Color {r: 0.5, g: 0.5, b: 0.5});
@@ -395,10 +395,10 @@ fn setup_scene(render_options: &RenderOptions) -> Scene {
         objects: vec![
             Box::new(transformed_plane),
             // Box::new(transformed_aabb),
-            // Box::new(transformed_sphere_a),
-            // Box::new(transformed_sphere_b),
+            Box::new(transformed_sphere_a),
+            Box::new(transformed_sphere_b),
             // Box::new(transformed_cone),
-            Box::new(transformed_mesh),
+            // Box::new(transformed_mesh),
         ],
         camera: Camera::from_z_position(-1.0, render_options.fov, render_options.projection_type, WIDTH, HEIGHT),
         background_color: Color {r: 0.204, g: 0.596, b: 0.86},
