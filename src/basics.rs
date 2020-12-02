@@ -306,10 +306,10 @@ impl Ray {
 
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub enum MeshNormalType {Precomputed, Provided, Face}
+pub enum MeshNormalType {Provided, Precomputed, Face}
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub enum BVType {Sphere, BBox, None}
+pub enum BVType {BBox, Sphere, None}
 
 
 #[derive(Debug, Clone, Copy)]
@@ -325,7 +325,7 @@ pub struct RayOptions {
 impl RayOptions {
     pub fn from_depth(depth: u32) -> Self {
         RayOptions {
-            bvh_display_level: 1000,
+            bvh_display_level: 15,
             mesh_normal_type: MeshNormalType::Provided,
             depth: depth,
             light_shift: None,

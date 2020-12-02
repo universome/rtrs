@@ -2,6 +2,7 @@ use rand::Rng;
 use rand::seq::SliceRandom;
 use rand::rngs::ThreadRng;
 
+use crate::ray_tracer::RenderOptions;
 use crate::camera::{Camera};
 use crate::surface::surface::{Surface, Hit, VisualData};
 use crate::basics::*;
@@ -151,12 +152,12 @@ impl Scene {
         color
     }
 
-    pub fn compute_pixel(&self, i: u32, j: u32, ray_options: RayOptions) -> Color {
+    pub fn compute_pixel(&self, i: u32, j: u32, render_options: &RenderOptions) -> Color {
         // let shifts = (0..25).map(|_| rng.gen::<f32>()).collect::<Vec<f32>>();
         let rays;
         let mut rng = rand::thread_rng();
 
-        if false {
+        if render_options.use_supersampling {
             rays = iproduct!(0..NUM_DIST_RT_SAMPLES, 0..NUM_DIST_RT_SAMPLES)
                 .map(|p: (i32, i32)| self.camera.generate_ray(
                     (i as f32) + (p.0 as f32) / NUM_DIST_RT_SAMPLES as f32 + rng.gen::<f32>(),
@@ -169,7 +170,7 @@ impl Scene {
 
         let mut light_shifts;
 
-        if false {
+        if render_options.use_soft_shadows {
             light_shifts = iproduct!(0..NUM_DIST_RT_SAMPLES, 0..NUM_DIST_RT_SAMPLES)
                 .map(|p: (i32, i32)| Some((
                     (p.0 as f32) / NUM_DIST_RT_SAMPLES as f32 + rng.gen::<f32>(),
@@ -187,9 +188,9 @@ impl Scene {
             .map(|(i, ray)| &self.compute_ray_color(ray, &mut rng, RayOptions {
                     depth: 0,
                     light_shift: light_shifts[i],
-                    mesh_normal_type: ray_options.mesh_normal_type,
-                    bvh_display_level: ray_options.bvh_display_level,
-                    bv_type: ray_options.bv_type,
+                    mesh_normal_type: render_options.ray_opts.mesh_normal_type,
+                    bvh_display_level: render_options.ray_opts.bvh_display_level,
+                    bv_type: render_options.ray_opts.bv_type,
                 }) * (1.0 / rays.len() as f32))
             .fold(Color::zero(), |c1, c2| &c1 + &c2)
     }

@@ -24,21 +24,21 @@ static HEIGHT: u32 = 600;
 
 
 pub struct State {
-    opts: RenderOptions,
-    is_mouse_inited: bool,
-    curr_mouse_x: f32,
-    curr_mouse_y: f32,
-    mouse_sensitivity: f32,
-    move_speed: f32,
-    mouse_is_in_window: bool,
-    scroll_speed: f32,
-    rotation_speed: f32,
-    scale_speed: f32,
-    selected_scene_idx: u32,
-    simple_teapot: TriangleMesh,
-    teapot: TriangleMesh,
-    teacup: TriangleMesh,
-    spoon: TriangleMesh,
+    pub opts: RenderOptions,
+    pub is_mouse_inited: bool,
+    pub curr_mouse_x: f32,
+    pub curr_mouse_y: f32,
+    pub mouse_sensitivity: f32,
+    pub move_speed: f32,
+    pub mouse_is_in_window: bool,
+    pub scroll_speed: f32,
+    pub rotation_speed: f32,
+    pub scale_speed: f32,
+    pub selected_scene_idx: u32,
+    pub simple_teapot: TriangleMesh,
+    pub teapot: TriangleMesh,
+    pub teacup: TriangleMesh,
+    pub spoon: TriangleMesh,
 }
 
 
@@ -52,10 +52,10 @@ impl State {
         // }]
         let lookat_transform = render_options.camera_opts.compute_lookat();
         vec![Light {
-            location: &lookat_transform * &Point {x: -0.25, y: 10.0, z: -0.25},
+            location: &lookat_transform * &Point {x: -0.1, y: 10.0, z: -0.1},
             color: Color {r: 1.0, g: 1.0, b: 1.0},
-            right: &lookat_transform * &Vec3::new(0.5, 0.0, 0.0),
-            top: &lookat_transform * &Vec3::new(0.0, 0.0, 0.5),
+            right: &lookat_transform * &Vec3::new(0.2, 0.0, 0.0),
+            top: &lookat_transform * &Vec3::new(0.0, 0.0, 0.2),
         }]
     }
 
@@ -111,7 +111,7 @@ impl State {
             color: Color {r: 1.0, g: 0.0, b: 0.0},
             specular_strength: 0.5,
             reflection_strength: 0.5,
-            reflection_glossiness: 0.0,
+            reflection_glossiness: render_options.reflection_glossiness,
         });
         let sphere_b_transform = &lookat_transform * &render_options.transformations[2];
         let transformed_sphere_b = TransformedSurface::new(sphere_b_transform, sphere_b);
@@ -124,7 +124,7 @@ impl State {
             0 => State::setup_simple_scene_objects(&self.opts),
             1 => self.setup_simple_mesh_scene_objects(&self.opts),
             2 => self.setup_mesh_scene_objects(&self.opts),
-            _ => panic!()
+            _ => panic!("Wrong scene ID has been selected!")
         });
         let lights = State::setup_lights(&self.opts);
         let mut scene_objects = vec![State::setup_plane(&self.opts)];
@@ -144,17 +144,20 @@ impl State {
 
 #[derive(Debug, Clone)]
 pub struct RenderOptions {
-    projection_type: ProjectionType,
-    number_of_lights: u32,
-    camera_opts: CameraOptions,
-    selected_pixel: Option<(u32, u32)>,
-    selected_object_idx: Option<usize>,
-    transformations: [AffineMat3; 5],
-    specular_strengths: [f32; 5],
-    spheres_fly_radius: f32,
-    spheres_fly_speed: f32,
-    fov: f32,
-    ray_opts: RayOptions,
+    pub projection_type: ProjectionType,
+    pub number_of_lights: u32,
+    pub camera_opts: CameraOptions,
+    pub selected_pixel: Option<(u32, u32)>,
+    pub selected_object_idx: Option<usize>,
+    pub transformations: [AffineMat3; 5],
+    pub specular_strengths: [f32; 5],
+    pub spheres_fly_radius: f32,
+    pub spheres_fly_speed: f32,
+    pub fov: f32,
+    pub ray_opts: RayOptions,
+    pub reflection_glossiness: f32,
+    pub use_soft_shadows: bool,
+    pub use_supersampling: bool,
 }
 
 
@@ -196,13 +199,43 @@ fn update_on_event(app: &App, state: &mut State, event: Event) {
         state.opts.update_transformations_on_time(app.time);
     }
 
-    process_keys(app, state);
-    // process_mouse_events(app, state, event);
+    process_pressed_keys(app, state);
+    process_mouse_events(app, state, event);
     // process_mouse_move(app, state);
 }
 
 
-fn process_keys(app: &App, state: &mut State) {
+fn process_key_released_event(app: &App, state: &mut State, key: Key) {
+    match key {
+        Key::F => {
+            state.opts.ray_opts.mesh_normal_type = match state.opts.ray_opts.mesh_normal_type {
+                MeshNormalType::Provided => MeshNormalType::Precomputed,
+                MeshNormalType::Precomputed => MeshNormalType::Face,
+                MeshNormalType::Face => MeshNormalType::Provided,
+            }
+        },
+        Key::B => {
+            state.opts.ray_opts.bv_type = match state.opts.ray_opts.bv_type {
+                BVType::BBox => BVType::Sphere,
+                BVType::Sphere => BVType::None,
+                BVType::None => BVType::BBox,
+            }
+        },
+        Key::Key1 => state.selected_scene_idx = 0,
+        Key::Key2 => state.selected_scene_idx = 1,
+        Key::Key3 => state.selected_scene_idx = 2,
+        Key::Up => state.opts.ray_opts.bvh_display_level += 1,
+        Key::Down => state.opts.ray_opts.bvh_display_level -= 1,
+        Key::I => state.opts.use_supersampling = !state.opts.use_supersampling,
+        Key::O => state.opts.use_soft_shadows = !state.opts.use_soft_shadows,
+        Key::P => state.opts.reflection_glossiness = if state.opts.reflection_glossiness == 0.0 {0.2} else {0.0},
+        Key::Q => *state = init_state(),
+        _ => {},
+    }
+}
+
+
+fn process_pressed_keys(app: &App, state: &mut State) {
     let camera_transformation = AffineMat3::create_look_at(
         &state.opts.camera_opts.position,
         state.opts.camera_opts.yaw,
@@ -225,55 +258,51 @@ fn process_keys(app: &App, state: &mut State) {
         state.opts.camera_opts.position = &state.opts.camera_opts.position + &(&camera_transformation.transform_mat[0] * -state.move_speed);
     }
 
-    if app.keys.down.contains(&Key::L) {
-        state.opts.selected_object_idx = Some(4); // Selecting the light
-    }
+    // if app.keys.down.contains(&Key::L) {
+    //     state.opts.selected_object_idx = Some(4); // Selecting the light
+    // }
 
-    if let Some(idx) = state.opts.selected_object_idx {
-        let mut transformation = None;
+    // if let Some(idx) = state.opts.selected_object_idx {
+    //     let mut transformation = None;
 
-        if app.keys.down.contains(&Key::Key1) {
-            if app.keys.down.contains(&Key::Up) {
-                transformation = Some(AffineMat3::scale(Vec3::new(1.0 + state.scale_speed, 1.0, 1.0)));
-            } else if app.keys.down.contains(&Key::Down) {
-                transformation = Some(AffineMat3::scale(Vec3::new(1.0 - state.scale_speed, 1.0, 1.0)));
-            }
-        } else if app.keys.down.contains(&Key::Key2) {
-            if app.keys.down.contains(&Key::Up) {
-                transformation = Some(AffineMat3::scale(Vec3::new(1.0, 1.0 + state.scale_speed, 1.0)));
-            } else if app.keys.down.contains(&Key::Down) {
-                transformation = Some(AffineMat3::scale(Vec3::new(1.0, 1.0 - state.scale_speed, 1.0)));
-            }
-        } else if app.keys.down.contains(&Key::Key3) {
-            if app.keys.down.contains(&Key::Up) {
-                transformation = Some(AffineMat3::scale(Vec3::new(1.0, 1.0, 1.0 + state.scale_speed)));
-            } else if app.keys.down.contains(&Key::Down) {
-                transformation = Some(AffineMat3::scale(Vec3::new(1.0, 1.0, 1.0 - state.scale_speed)));
-            }
-        } else if app.keys.down.contains(&Key::Up) {
-            transformation = Some(AffineMat3::translation(&camera_transformation.transform_mat[1] * state.move_speed));
-        } else if app.keys.down.contains(&Key::Down) {
-            transformation = Some(AffineMat3::translation(&camera_transformation.transform_mat[1] * -state.move_speed));
-        } else if app.keys.down.contains(&Key::Right) {
-            transformation = Some(AffineMat3::translation(&camera_transformation.transform_mat[0] * state.move_speed));
-        } else if app.keys.down.contains(&Key::Left) {
-            transformation = Some(AffineMat3::translation(&camera_transformation.transform_mat[0] * -state.move_speed));
-        } else if app.keys.down.contains(&Key::I) {
-            transformation = Some(AffineMat3::rotation(state.rotation_speed, &Vec3::new(1.0, 0.0, 0.0)));
-        } else if app.keys.down.contains(&Key::O) {
-            transformation = Some(AffineMat3::rotation(state.rotation_speed, &Vec3::new(0.0, 1.0, 0.0)));
-        } else if app.keys.down.contains(&Key::P) {
-            transformation = Some(AffineMat3::rotation(state.rotation_speed, &Vec3::new(0.0, 0.0, 1.0)));
-        }
+    //     if app.keys.down.contains(&Key::Key1) {
+    //         if app.keys.down.contains(&Key::Up) {
+    //             transformation = Some(AffineMat3::scale(Vec3::new(1.0 + state.scale_speed, 1.0, 1.0)));
+    //         } else if app.keys.down.contains(&Key::Down) {
+    //             transformation = Some(AffineMat3::scale(Vec3::new(1.0 - state.scale_speed, 1.0, 1.0)));
+    //         }
+    //     } else if app.keys.down.contains(&Key::Key2) {
+    //         if app.keys.down.contains(&Key::Up) {
+    //             transformation = Some(AffineMat3::scale(Vec3::new(1.0, 1.0 + state.scale_speed, 1.0)));
+    //         } else if app.keys.down.contains(&Key::Down) {
+    //             transformation = Some(AffineMat3::scale(Vec3::new(1.0, 1.0 - state.scale_speed, 1.0)));
+    //         }
+    //     } else if app.keys.down.contains(&Key::Key3) {
+    //         if app.keys.down.contains(&Key::Up) {
+    //             transformation = Some(AffineMat3::scale(Vec3::new(1.0, 1.0, 1.0 + state.scale_speed)));
+    //         } else if app.keys.down.contains(&Key::Down) {
+    //             transformation = Some(AffineMat3::scale(Vec3::new(1.0, 1.0, 1.0 - state.scale_speed)));
+    //         }
+    //     } else if app.keys.down.contains(&Key::Up) {
+    //         transformation = Some(AffineMat3::translation(&camera_transformation.transform_mat[1] * state.move_speed));
+    //     } else if app.keys.down.contains(&Key::Down) {
+    //         transformation = Some(AffineMat3::translation(&camera_transformation.transform_mat[1] * -state.move_speed));
+    //     } else if app.keys.down.contains(&Key::Right) {
+    //         transformation = Some(AffineMat3::translation(&camera_transformation.transform_mat[0] * state.move_speed));
+    //     } else if app.keys.down.contains(&Key::Left) {
+    //         transformation = Some(AffineMat3::translation(&camera_transformation.transform_mat[0] * -state.move_speed));
+    //     } else if app.keys.down.contains(&Key::I) {
+    //         transformation = Some(AffineMat3::rotation(state.rotation_speed, &Vec3::new(1.0, 0.0, 0.0)));
+    //     } else if app.keys.down.contains(&Key::O) {
+    //         transformation = Some(AffineMat3::rotation(state.rotation_speed, &Vec3::new(0.0, 1.0, 0.0)));
+    //     } else if app.keys.down.contains(&Key::P) {
+    //         transformation = Some(AffineMat3::rotation(state.rotation_speed, &Vec3::new(0.0, 0.0, 1.0)));
+    //     }
 
-        if transformation.is_some() {
-            state.opts.transformations[idx] = &state.opts.transformations[idx] * &transformation.unwrap();
-        }
-    }
-
-    if app.keys.down.contains(&Key::Q) {
-        *state = init_state();
-    }
+    //     if transformation.is_some() {
+    //         state.opts.transformations[idx] = &state.opts.transformations[idx] * &transformation.unwrap();
+    //     }
+    // }
 }
 
 
@@ -316,6 +345,7 @@ fn process_mouse_events(app: &App, state: &mut State, event: Event) {
 
                     // dbg!(&state.opts.camera_opts.position);
                 // },
+                KeyReleased(key) => process_key_released_event(app, state, key),
                 MouseWheel(scroll_delta, _) => {
                     match scroll_delta {
                         MouseScrollDelta::PixelDelta(position) => {
@@ -416,13 +446,12 @@ fn init_state() -> State {
 
 
 pub fn render_state(state: &State) -> DynamicImage {
-    let ray_options = RayOptions::from_depth(0);
     let scene = state.compute_scene();
     let pixels = iproduct!(0..HEIGHT, 0..WIDTH)
         .collect::<Vec<(u32, u32)>>()
         .par_iter()
         .map(|p: &(u32, u32)| -> Color {
-            scene.compute_pixel(p.1, HEIGHT - p.0, ray_options)
+            scene.compute_pixel(p.1, HEIGHT - p.0, &state.opts)
         })
         .collect::<Vec<Color>>();
 
@@ -440,19 +469,22 @@ pub fn render_state(state: &State) -> DynamicImage {
 impl RenderOptions {
     fn defaults() -> Self {
         RenderOptions {
+            use_soft_shadows: false,
+            use_supersampling: false,
+            reflection_glossiness: 0.0,
             ray_opts: RayOptions::from_depth(0),
             projection_type: ProjectionType::Perspective,
             number_of_lights: 1,
             selected_pixel: None,
             selected_object_idx: None,
-            spheres_fly_radius: 1.0,
+            spheres_fly_radius: 2.0,
             spheres_fly_speed: 0.3,
             specular_strengths: [0.0, 0.0, 0.0, 0.0, 0.0],
             fov: std::f32::consts::PI * 0.5,
             camera_opts: CameraOptions {
                 yaw: -0.5 * std::f32::consts::PI,
                 pitch: 0.0,
-                position: Vec3 {x: 0.0, y: 0.0, z: -5.0},
+                position: Vec3 {x: 0.0, y: 0.0, z: -7.0},
             },
             transformations: [
                 AffineMat3::identity(),
