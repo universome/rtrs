@@ -202,7 +202,7 @@ impl TriangleMesh {
         }
 
         TriangleMesh {
-            bvh: Some(BoundingVolumeHierarchy::from_triangles_list(triangles.clone(), 0)),
+            bvh: Some(BoundingVolumeHierarchy::from_triangles_list(triangles.clone(), 0, 0)),
             positions: positions_arc,
             calculated_normals: calculated_normals_arc,
             triangles: triangles,
@@ -256,7 +256,7 @@ struct BoundingVolumeHierarchy {
 
 
 impl BoundingVolumeHierarchy {
-    pub fn from_triangles_list(triangles: Vec<Triangle>, bvh_level: i32) -> Self {
+    pub fn from_triangles_list(triangles: Vec<Triangle>, bvh_level: i32, axis: u32) -> Self {
         assert!(triangles.len() > 0);
 
         if triangles.len() == 1 {
@@ -288,16 +288,24 @@ impl BoundingVolumeHierarchy {
         let sphere = BoundingVolumeHierarchy::compute_sphere_from_triangles(&triangles);
         let bbox = BoundingVolumeHierarchy::compute_bbox_from_triangles(&triangles);
         let mut triangles = triangles;
-        triangles.sort_by(|t1, t2| t1.compute_center().x.partial_cmp(&t2.compute_center().x).unwrap());
+        if axis == 0 {
+            triangles.sort_by(|t1, t2| t1.compute_center().x.partial_cmp(&t2.compute_center().x).unwrap());
+        } else if axis == 1 {
+            triangles.sort_by(|t1, t2| t1.compute_center().y.partial_cmp(&t2.compute_center().y).unwrap());
+        } else if axis == 2 {
+            triangles.sort_by(|t1, t2| t1.compute_center().y.partial_cmp(&t2.compute_center().y).unwrap());
+        } else {
+            panic!("Wrong axis: {}", axis);
+        }
         let (triangles_left, triangles_right) = triangles.split_at(triangles.len() / 2);
 
         let triangle_left = if triangles_left.len() == 1 {Some(triangles_left[0].clone())} else {None};
         let bvh_left = if triangles_left.len() == 1 {None} else {
-            Some(Box::new(BoundingVolumeHierarchy::from_triangles_list(triangles_left.to_vec(), bvh_level + 1)))
+            Some(Box::new(BoundingVolumeHierarchy::from_triangles_list(triangles_left.to_vec(), bvh_level + 1, (axis + 1) % 3)))
         };
         let triangle_right = if triangles_right.len() == 1 {Some(triangles_right[0].clone())} else {None};
         let bvh_right = if triangles_right.len() == 1 {None} else {
-            Some(Box::new(BoundingVolumeHierarchy::from_triangles_list(triangles_right.to_vec(), bvh_level + 1)))
+            Some(Box::new(BoundingVolumeHierarchy::from_triangles_list(triangles_right.to_vec(), bvh_level + 1, (axis + 1) % 3)))
         };
 
         BoundingVolumeHierarchy  {
@@ -313,22 +321,21 @@ impl BoundingVolumeHierarchy {
     }
 
     pub fn compute_sphere_from_triangles(triangles: &Vec<Triangle>) -> Sphere {
-        let mut center = Point::zero();
+        let mut min = &Point::zero() + f32::INFINITY;
+        let mut max = &Point::zero() + (-f32::INFINITY);
+
         for i in 0..triangles.len() {
-            let triangle_center = triangles[i].compute_center();
-            center.x += triangle_center.x * (1.0 / triangles.len() as f32);
-            center.y += triangle_center.y * (1.0 / triangles.len() as f32);
-            center.z += triangle_center.z * (1.0 / triangles.len() as f32);
+            min.x = min.x.min(triangles[i].min_dim(0));
+            min.y = min.y.min(triangles[i].min_dim(1));
+            min.z = min.z.min(triangles[i].min_dim(2));
+            max.x = max.x.max(triangles[i].max_dim(0));
+            max.y = max.y.max(triangles[i].max_dim(1));
+            max.z = max.z.max(triangles[i].max_dim(2));
         }
+        let center = &min + &(&(&max - &min) * 0.5);
+        let radius = (&max - &min).norm() * 0.5;
 
-        let max_distance = triangles.iter().map(|t| -> f32 {
-            0.0_f32
-                .max((&t.positions[t.indices.0] - &center).norm())
-                .max((&t.positions[t.indices.1] - &center).norm())
-                .max((&t.positions[t.indices.2] - &center).norm())
-        }).fold(0.0, |x: f32, y: f32| x.max(y));
-
-        Sphere::from_position(max_distance + 0.001, center)
+        Sphere::from_position(radius + 0.001, center)
     }
 
     pub fn compute_bbox_from_triangles(triangles: &Vec<Triangle>) -> AxisAlignedBox {
@@ -371,6 +378,7 @@ impl Surface for BoundingVolumeHierarchy {
         } else {
             None
         };
+
         let right_hit = if self.triangle_right.is_some() {
             self.triangle_right.as_ref().unwrap().compute_hit(ray, ray_options)
         } else if self.bvh_right.is_some() {

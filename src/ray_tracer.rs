@@ -213,7 +213,7 @@ fn update_on_event(app: &App, state: &mut State, event: Event) {
 
 fn process_key_released_event(app: &App, state: &mut State, key: Key) {
     match key {
-        Key::F => {
+        Key::G => {
             state.opts.ray_opts.mesh_normal_type = match state.opts.ray_opts.mesh_normal_type {
                 MeshNormalType::Provided => MeshNormalType::Precomputed,
                 MeshNormalType::Precomputed => MeshNormalType::Face,
@@ -221,13 +221,13 @@ fn process_key_released_event(app: &App, state: &mut State, key: Key) {
             };
             println!("Set bvh_display_level to {:?}", state.opts.ray_opts.mesh_normal_type);
         },
-        Key::G => {
+        Key::F => {
             state.opts.ray_opts.mesh_normal_type = match state.opts.ray_opts.mesh_normal_type {
                 MeshNormalType::Precomputed => MeshNormalType::Provided,
                 MeshNormalType::Face => MeshNormalType::Precomputed,
                 MeshNormalType::Provided => MeshNormalType::Face,
             };
-            println!("Set bvh_display_level to {:?}", state.opts.ray_opts.mesh_normal_type);
+            println!("Set mesh_normal_type to {:?}", state.opts.ray_opts.mesh_normal_type);
         },
         Key::B => {
             state.opts.ray_opts.bv_type = match state.opts.ray_opts.bv_type {
@@ -237,9 +237,18 @@ fn process_key_released_event(app: &App, state: &mut State, key: Key) {
             };
             println!("Set bv_type to {:?}", state.opts.ray_opts.bv_type);
         },
+        Key::V => {
+            state.opts.ray_opts.bv_type = match state.opts.ray_opts.bv_type {
+                BVType::Sphere => BVType::BBox,
+                BVType::None => BVType::Sphere,
+                BVType::BBox => BVType::None,
+            };
+            println!("Set bv_type to {:?}", state.opts.ray_opts.bv_type);
+        },
         Key::Key1 => state.selected_scene_idx = 0,
         Key::Key2 => state.selected_scene_idx = 1,
         Key::Key3 => state.selected_scene_idx = 2,
+        Key::Key0 => state.opts.ray_opts.bvh_display_level = 0,
         Key::Up => {
             state.opts.ray_opts.bvh_display_level += 1;
             println!("Set bvh_display_level to {}", state.opts.ray_opts.bvh_display_level);
