@@ -194,7 +194,7 @@ fn init_app(app: &App) -> State {
 
     app
         .new_window()
-        .title("CS248 Computer Graphics")
+        .title("RtRs")
         .size(WIDTH as u32, HEIGHT as u32)
         .view(render_and_display)
         .build()

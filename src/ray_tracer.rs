@@ -190,7 +190,7 @@ pub fn launch() {
 fn init_nannou(app: &App) -> State {
     app
         .new_window()
-        .title("CS248 Computer Graphics")
+        .title("RtRs")
         .size(WIDTH, HEIGHT)
         .view(view)
         .build()

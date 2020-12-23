@@ -1,5 +1,5 @@
 [package]
-name = "cs248-computer-graphics"
+name = "rtrs"
 version = "0.1.0"
 authors = ["Ivan Skorokhodov <iskorokhodov@gmail.com>"]
 edition = "2018"
