@@ -22,7 +22,7 @@ impl Surface for AxisAlignedBox {
 
         if t_min > t_max {
             mem::swap(&mut t_min, &mut t_max);
-        };
+        }
 
         let mut t_y_min = (self.min_corner.y - ray.origin.y) / (ray.direction.y + EPSILON);
         let mut t_y_max = (self.max_corner.y - ray.origin.y) / (ray.direction.y + EPSILON);

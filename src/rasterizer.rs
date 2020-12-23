@@ -327,60 +327,66 @@ fn render_state(state: &State) -> DynamicImage{
         let y0 = cmp::max(0, y_min.floor() as i32) as usize;
         let y1 = cmp::min(frame_height as i32 - 1, y_max.floor() as i32) as usize;
 
-        let area = compute_det_from_points(&v0_screen, &v1_screen, &v2_screen);
-
         for y in y0..(y1 + 1) {
             for x in x0..(x1 + 1) {
                 let pixel_pos = Point::new(x as f32 + 0.5, y as f32 + 0.5, 0.0);
-                let bar_coords = (
-                    compute_det_from_points(&v1_screen, &v2_screen, &pixel_pos) / area,
-                    compute_det_from_points(&v2_screen, &v0_screen, &pixel_pos) / area,
-                    compute_det_from_points(&v0_screen, &v1_screen, &pixel_pos) / area,
+                let mut bar_coords = (
+                    compute_det_from_points(&v1_screen, &v2_screen, &pixel_pos),
+                    compute_det_from_points(&v2_screen, &v0_screen, &pixel_pos),
+                    compute_det_from_points(&v0_screen, &v1_screen, &pixel_pos),
                 );
 
-                if bar_coords.0 >= 0.0 && bar_coords.1 >= 0.0 && bar_coords.2 >= 0.0 {
-                    let depth = 1.0 / (bar_coords.0 / v0_screen.z + bar_coords.1 / v1_screen.z + bar_coords.2 / v2_screen.z);
+                if bar_coords.0 < 0.0 || bar_coords.1 < 0.0 || bar_coords.2 < 0.0 {
+                    continue;
+                }
 
-                    if depth < z_buffer[y * frame_width + x] {
-                        z_buffer[y * frame_width + x] = depth;
+                // Normalizing the coordinates
+                let area = bar_coords.0 + bar_coords.1 + bar_coords.2;
+                bar_coords = (bar_coords.0 / area, bar_coords.1 / area, bar_coords.2 / area);
 
-                        let mut color = 0.1; // Ambient strength
+                let depth = 1.0 / (bar_coords.0 / v0_screen.z + bar_coords.1 / v1_screen.z + bar_coords.2 / v2_screen.z);
 
-                        if state.is_gouraud_shading {
-                            let diffuse_strength = 0.7 * colors_gouraud.0 * bar_coords.0 + colors_gouraud.1 * bar_coords.1 + colors_gouraud.2 * bar_coords.2;
-                            color += diffuse_strength;
+                if depth >= z_buffer[y * frame_width + x] {
+                    continue;
+                }
 
-                            if state.specular_lighting_enabled {
-                                color += gouraud_speculars.0 * bar_coords.0 + gouraud_speculars.1 * bar_coords.1 + gouraud_speculars.2 * bar_coords.2;
-                            }
-                        } else {
-                            let px = (v0_camera.x / -v0_camera.z) * bar_coords.0 + (v1_camera.x / -v1_camera.z) * bar_coords.1 + (v2_camera.x / -v2_camera.z) * bar_coords.2;
-                            let py = (v0_camera.y / -v0_camera.z) * bar_coords.0 + (v1_camera.y / -v1_camera.z) * bar_coords.1 + (v2_camera.y / -v2_camera.z) * bar_coords.2;
-                            let pos_camera = Point::new(px * depth, py * depth, -depth); // fragmet position is in the camera space
-                            let light_dir = (&light_pos_camera - &pos_camera).normalize();
-                            let point_normal_camera = (&normal_v0_camera * bar_coords.0  + &normal_v1_camera * bar_coords.1  + &normal_v2_camera * bar_coords.2).normalize();
-                            let diffuse_strength = point_normal_camera.dot_product(&light_dir);
-                            color += diffuse_strength;
+                z_buffer[y * frame_width + x] = depth;
 
-                            if state.specular_lighting_enabled {
-                                let view_direction = (-&Vec3::new(pos_camera.x, pos_camera.y, pos_camera.z)).normalize();
+                let mut color = 0.1; // Ambient strength
 
-                                color += compute_specular(&point_normal_camera, &view_direction, &light_dir);
-                            }
-                        }
+                if state.is_gouraud_shading {
+                    let diffuse_strength = 0.7 * colors_gouraud.0 * bar_coords.0 + colors_gouraud.1 * bar_coords.1 + colors_gouraud.2 * bar_coords.2;
+                    color += diffuse_strength;
 
-                        if !tex.is_empty() && state.tex_enabled {
-                            let tex_coords = (
-                                (st0.0 * bar_coords.0 + st1.0 * bar_coords.1 + st2.0 * bar_coords.2) * depth,
-                                (st0.1 * bar_coords.0 + st1.1 * bar_coords.1 + st2.1 * bar_coords.2) * depth,
-                            );
+                    if state.specular_lighting_enabled {
+                        color += gouraud_speculars.0 * bar_coords.0 + gouraud_speculars.1 * bar_coords.1 + gouraud_speculars.2 * bar_coords.2;
+                    }
+                } else {
+                    let px = (v0_camera.x / -v0_camera.z) * bar_coords.0 + (v1_camera.x / -v1_camera.z) * bar_coords.1 + (v2_camera.x / -v2_camera.z) * bar_coords.2;
+                    let py = (v0_camera.y / -v0_camera.z) * bar_coords.0 + (v1_camera.y / -v1_camera.z) * bar_coords.1 + (v2_camera.y / -v2_camera.z) * bar_coords.2;
+                    let pos_camera = Point::new(px * depth, py * depth, -depth); // Fragmet position is in the camera space
+                    let light_dir = (&light_pos_camera - &pos_camera).normalize();
+                    let point_normal_camera = (&normal_v0_camera * bar_coords.0  + &normal_v1_camera * bar_coords.1  + &normal_v2_camera * bar_coords.2).normalize();
+                    let diffuse_strength = point_normal_camera.dot_product(&light_dir);
+                    color += diffuse_strength;
 
-                            color += compute_stripe_color(tex_coords.0, tex_coords.1);
-                        }
+                    if state.specular_lighting_enabled {
+                        let view_direction = (-&Vec3::new(pos_camera.x, pos_camera.y, pos_camera.z)).normalize();
 
-                        frame_buffer[y * frame_width + x] = Color::new(color, color, color);
+                        color += compute_specular(&point_normal_camera, &view_direction, &light_dir);
                     }
                 }
+
+                if !tex.is_empty() && state.tex_enabled {
+                    let tex_coords = (
+                        (st0.0 * bar_coords.0 + st1.0 * bar_coords.1 + st2.0 * bar_coords.2) * depth,
+                        (st0.1 * bar_coords.0 + st1.1 * bar_coords.1 + st2.1 * bar_coords.2) * depth,
+                    );
+
+                    color += compute_stripe_color(tex_coords.0, tex_coords.1);
+                }
+
+                frame_buffer[y * frame_width + x] = Color::new(color, color, color);
             }
         }
     }
